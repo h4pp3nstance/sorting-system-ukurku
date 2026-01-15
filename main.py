@@ -41,6 +41,9 @@ from core import (
     classify_package,
 )
 
+# Computer Vision
+from cv import create_dimension_detector
+
 
 class SortingSystem:
     """
@@ -55,6 +58,11 @@ class SortingSystem:
         self._init_sensors()
         self._init_actuators()
         self._init_output()
+        
+        # Initialize CV module
+        use_mock_cv = self.mode == "mock"
+        self.dimension_detector = create_dimension_detector(use_mock=use_mock_cv)
+        print(f"[System] CV Module initialized (mock={use_mock_cv})")
     
     def _init_sensors(self):
         """Initialize all sensors"""
@@ -134,24 +142,33 @@ class SortingSystem:
     
     def measure_dimensions(self) -> tuple:
         """
-        Measure package dimensions using cameras
+        Measure package dimensions using cameras and CV
         Returns:
             tuple: (panjang, lebar, tinggi) in cm
         """
-        print("\n[System] Measuring dimensions...")
+        print("\n[System] Measuring dimensions with CV...")
         
-        # Capture images
+        # Capture images from cameras
         img_top = self.camera_top.capture()
         img_side = self.camera_side.capture()
         
-        # TODO: Implement actual CV dimension detection
-        # For now, use mock random values
-        import random
-        panjang = round(random.uniform(5, 23), 1)
-        lebar = round(random.uniform(5, 23), 1)
-        tinggi = round(random.uniform(5, 23), 1)
+        # Use CV module to detect dimensions
+        result = self.dimension_detector.detect_dimensions(img_top, img_side)
         
-        print(f"[System] Dimensions: {panjang} × {lebar} × {tinggi} cm")
+        if result.success:
+            panjang = result.length_cm
+            lebar = result.width_cm
+            tinggi = result.height_cm
+            confidence = result.confidence
+            print(f"[System] CV Detection: {panjang} × {lebar} × {tinggi} cm (confidence: {confidence:.2f})")
+        else:
+            # Fallback to random values if CV fails
+            import random
+            panjang = round(random.uniform(5, 23), 1)
+            lebar = round(random.uniform(5, 23), 1)
+            tinggi = round(random.uniform(5, 23), 1)
+            print(f"[System] CV failed ({result.error_message}), using fallback: {panjang} × {lebar} × {tinggi} cm")
+        
         return panjang, lebar, tinggi
     
     def process_package(self) -> PackageData:
