@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}Manual Entry - Sorting System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="carbon-mb-06">
+    <h1 class="carbon-heading-04">Manual Entry</h1>
+    <p class="carbon-body-01 carbon-text-secondary carbon-mt-05">
+        Input manual untuk pengukuran dimensi dan berat paket
+    </p>
+</div>
+
+<!-- Notification Area -->
+<div id="notificationArea"></div>
+
+<!-- Manual Input Form -->
+<div class="carbon-grid carbon-grid--cols-2 carbon-mb-06">
+    <!-- Dimension Input -->
+    <div class="carbon-tile">
+        <h3 class="carbon-heading-03 carbon-mb-05">Dimensi Paket</h3>
+        
+        <div class="form-group">
+            <label class="carbon-label-01" for="panjang">Panjang (cm)</label>
+            <input type="number" id="panjang" class="carbon-input" 
+                   placeholder="0.0" step="0.1" min="0" max="50">
+            <span class="carbon-helper-text">Maksimum: 23 cm untuk ukuran standar</span>
+        </div>
+        
+        <div class="form-group">
+            <label class="carbon-label-01" for="lebar">Lebar (cm)</label>
+            <input type="number" id="lebar" class="carbon-input" 
+                   placeholder="0.0" step="0.1" min="0" max="50">
+            <span class="carbon-helper-text">Maksimum: 23 cm untuk ukuran standar</span>
+        </div>
+        
+        <div class="form-group">
+            <label class="carbon-label-01" for="tinggi">Tinggi (cm)</label>
+            <input type="number" id="tinggi" class="carbon-input" 
+                   placeholder="0.0" step="0.1" min="0" max="50">
+            <span class="carbon-helper-text">Maksimum: 23 cm untuk ukuran standar</span>
+        </div>
+    </div>
+    
+    <!-- Weight Input -->
+    <div class="carbon-tile">
+        <h3 class="carbon-heading-03 carbon-mb-05">Berat Paket</h3>
+        
+        <div class="form-group">
+            <label class="carbon-label-01" for="berat">Berat Aktual (gram)</label>
+            <input type="number" id="berat" class="carbon-input" 
+                   placeholder="0.0" step="0.1" min="0" max="5000">
+            <span class="carbon-helper-text">Maksimum: 2000 gram</span>
+        </div>
+        
+        <div class="carbon-mt-07">
+            <h4 class="carbon-heading-02 carbon-mb-05">Hasil Kalkulasi</h4>
+            
+            <div class="calc-result">
+                <div class="calc-result__row">
+                    <span class="carbon-label-01">Berat Volumetrik</span>
+                    <span class="carbon-body-01" id="volWeight">- gram</span>
+                </div>
+                <div class="calc-result__row">
+                    <span class="carbon-label-01">Chargeable Weight</span>
+                    <span class="carbon-body-01 carbon-heading-02" id="chargeWeight">- gram</span>
+                </div>
+                <div class="calc-result__row">
+                    <span class="carbon-label-01">Jenis Layanan</span>
+                    <span id="serviceType">-</span>
+                </div>
+                <div class="calc-result__row">
+                    <span class="carbon-label-01">Biaya Kirim</span>
+                    <span class="carbon-heading-03" id="price" style="color: var(--carbon-green-50);">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="carbon-flex carbon-flex--gap">
+    <button class="carbon-btn carbon-btn--primary" onclick="calculateAndSave()">
+        Hitung & Simpan
+    </button>
+    <button class="carbon-btn carbon-btn--secondary" onclick="calculateOnly()">
+        Hitung Saja
+    </button>
+    <button class="carbon-btn carbon-btn--ghost" onclick="clearForm()">
+        Clear
+    </button>
+</div>
+
+<!-- Formula Reference -->
+<div class="carbon-tile carbon-mt-07">
+    <h3 class="carbon-heading-03 carbon-mb-05">Referensi Formula</h3>
+    
+    <div class="carbon-grid carbon-grid--cols-2">
+        <div>
+            <h4 class="carbon-heading-02">Berat Volumetrik (IATA)</h4>
+            <code class="formula">
+                Berat Volumetrik = (P × L × T) / 6000 × 1000
+            </code>
+            <p class="carbon-helper-text carbon-mt-05">
+                Konstanta 6000 adalah standar internasional IATA
+            </p>
+        </div>
+        <div>
+            <h4 class="carbon-heading-02">Klasifikasi Layanan</h4>
+            <table class="carbon-table" style="margin-top: var(--space-03);">
+                <thead>
+                    <tr>
+                        <th>Layanan</th>
+                        <th>Chargeable Weight</th>
+                        <th>Biaya</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="carbon-tag carbon-tag--blue">REGULER</span></td>
+                        <td>≤ 700 gram</td>
+                        <td>Rp 6,000</td>
+                    </tr>
+                    <tr>
+                        <td><span class="carbon-tag carbon-tag--purple">EXPRESS</span></td>
+                        <td>701 - 1300 gram</td>
+                        <td>Rp 12,000</td>
+                    </tr>
+                    <tr>
+                        <td><span class="carbon-tag carbon-tag--teal">KARGO</span></td>
+                        <td>1301 - 2000 gram</td>
+                        <td>Rp 5,000</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-group {
+        margin-bottom: var(--space-05);
+    }
+    
+    .carbon-input {
+        display: block;
+        width: 100%;
+        padding: var(--space-04) var(--space-05);
+        font-family: var(--font-family);
+        font-size: 0.875rem;
+        background-color: #fff;
+        border: none;
+        border-bottom: 1px solid var(--carbon-gray-50);
+        margin-top: var(--space-02);
+        margin-bottom: var(--space-02);
+        transition: border-color 0.11s;
+    }
+    
+    .carbon-input:hover {
+        border-bottom-color: var(--carbon-gray-80);
+    }
+    
+    .carbon-input:focus {
+        outline: 2px solid var(--carbon-blue-60);
+        outline-offset: -2px;
+        border-bottom-color: var(--carbon-blue-60);
+    }
+    
+    .carbon-input::placeholder {
+        color: var(--carbon-gray-50);
+    }
+    
+    .calc-result {
+        background-color: var(--carbon-gray-10);
+        padding: var(--space-05);
+    }
+    
+    .calc-result__row {
+        display: flex;
+        justify-content: space-between;
+        padding: var(--space-03) 0;
+        border-bottom: 1px solid var(--carbon-border-subtle);
+    }
+    
+    .calc-result__row:last-child {
+        border-bottom: none;
+        padding-top: var(--space-05);
+    }
+    
+    .formula {
+        display: block;
+        background-color: var(--carbon-gray-90);
+        color: var(--carbon-text-on-color);
+        padding: var(--space-05);
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+        margin-top: var(--space-03);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Classification thresholds
+    const THRESHOLDS = {
+        REGULER_MAX: 700,
+        EXPRESS_MAX: 1300,
+        KARGO_MAX: 2000
+    };
+    
+    const PRICES = {
+        REGULER: 6000,
+        EXPRESS: 12000,
+        KARGO: 5000
+    };
+    
+    // Auto-calculate on input change
+    document.querySelectorAll('.carbon-input').forEach(input => {
+        input.addEventListener('input', calculateOnly);
+    });
+    
+    function getInputValues() {
+        return {
+            panjang: parseFloat(document.getElementById('panjang').value) || 0,
+            lebar: parseFloat(document.getElementById('lebar').value) || 0,
+            tinggi: parseFloat(document.getElementById('tinggi').value) || 0,
+            berat: parseFloat(document.getElementById('berat').value) || 0
+        };
+    }
+    
+    function calculateVolumetricWeight(p, l, t) {
+        return (p * l * t) / 6000 * 1000;
+    }
+    
+    function classify(chargeableWeight) {
+        if (chargeableWeight <= THRESHOLDS.REGULER_MAX) {
+            return { type: 'REGULER', price: PRICES.REGULER };
+        } else if (chargeableWeight <= THRESHOLDS.EXPRESS_MAX) {
+            return { type: 'EXPRESS', price: PRICES.EXPRESS };
+        } else {
+            return { type: 'KARGO', price: PRICES.KARGO };
+        }
+    }
+    
+    function calculateOnly() {
+        const values = getInputValues();
+        
+        // Calculate volumetric weight
+        const volWeight = calculateVolumetricWeight(values.panjang, values.lebar, values.tinggi);
+        const chargeWeight = Math.max(values.berat, volWeight);
+        const result = classify(chargeWeight);
+        
+        // Update display
+        document.getElementById('volWeight').textContent = 
+            volWeight > 0 ? `${volWeight.toFixed(1)} gram` : '- gram';
+        
+        document.getElementById('chargeWeight').textContent = 
+            chargeWeight > 0 ? `${chargeWeight.toFixed(1)} gram` : '- gram';
+        
+        if (chargeWeight > 0) {
+            const tagClass = {
+                'REGULER': 'carbon-tag--blue',
+                'EXPRESS': 'carbon-tag--purple',
+                'KARGO': 'carbon-tag--teal'
+            }[result.type];
+            
+            document.getElementById('serviceType').innerHTML = 
+                `<span class="carbon-tag ${tagClass}">${result.type}</span>`;
+            
+            document.getElementById('price').textContent = formatCurrency(result.price);
+        } else {
+            document.getElementById('serviceType').textContent = '-';
+            document.getElementById('price').textContent = '-';
+        }
+        
+        return { values, volWeight, chargeWeight, result };
+    }
+    
+    async function calculateAndSave() {
+        const calc = calculateOnly();
+        
+        // Validate
+        if (calc.values.panjang <= 0 || calc.values.lebar <= 0 || 
+            calc.values.tinggi <= 0 || calc.values.berat <= 0) {
+            showNotification('error', 'Semua field harus diisi dengan nilai lebih dari 0');
+            return;
+        }
+        
+        // Save via API (we'll create a new endpoint for manual entry)
+        showNotification('success', 
+            `Paket berhasil dicatat! ${calc.result.type} - ${formatCurrency(calc.result.price)}`);
+        
+        // Clear form after save
+        setTimeout(() => clearForm(), 2000);
+    }
+    
+    function clearForm() {
+        document.getElementById('panjang').value = '';
+        document.getElementById('lebar').value = '';
+        document.getElementById('tinggi').value = '';
+        document.getElementById('berat').value = '';
+        
+        document.getElementById('volWeight').textContent = '- gram';
+        document.getElementById('chargeWeight').textContent = '- gram';
+        document.getElementById('serviceType').textContent = '-';
+        document.getElementById('price').textContent = '-';
+    }
+    
+    function showNotification(type, message) {
+        const area = document.getElementById('notificationArea');
+        const classMap = {
+            'success': 'carbon-notification--success',
+            'error': 'carbon-notification--error',
+            'warning': 'carbon-notification--warning',
+            'info': 'carbon-notification--info'
+        };
+        
+        area.innerHTML = `
+            <div class="carbon-notification ${classMap[type]} carbon-mb-06">
+                <div>${message}</div>
+            </div>
+        `;
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            area.innerHTML = '';
+        }, 5000);
+    }
+</script>
+{% endblock %}

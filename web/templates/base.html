@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sorting System{% endblock %}</title>
+    
+    <!-- IBM Plex Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Carbon Design System Icons (simplified) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@carbon/icons@11.38.0/css/styles.min.css">
+    
+    <!-- Custom Carbon-inspired Styles -->
+    <style>
+        /* ===================================
+           IBM CARBON DESIGN SYSTEM
+           Custom Implementation for Flask
+           =================================== */
+        
+        :root {
+            /* Carbon Gray Scale */
+            --carbon-gray-10: #f4f4f4;
+            --carbon-gray-20: #e0e0e0;
+            --carbon-gray-30: #c6c6c6;
+            --carbon-gray-40: #a8a8a8;
+            --carbon-gray-50: #8d8d8d;
+            --carbon-gray-60: #6f6f6f;
+            --carbon-gray-70: #525252;
+            --carbon-gray-80: #393939;
+            --carbon-gray-90: #262626;
+            --carbon-gray-100: #161616;
+            
+            /* Carbon Theme Colors */
+            --carbon-blue-60: #0f62fe;
+            --carbon-blue-70: #0043ce;
+            --carbon-blue-80: #002d9c;
+            --carbon-green-50: #24a148;
+            --carbon-yellow-30: #f1c21b;
+            --carbon-red-60: #da1e28;
+            --carbon-purple-60: #8a3ffc;
+            --carbon-teal-50: #009d9a;
+            
+            /* Semantic Colors */
+            --carbon-background: #f4f4f4;
+            --carbon-background-hover: #e8e8e8;
+            --carbon-text-primary: #161616;
+            --carbon-text-secondary: #525252;
+            --carbon-text-on-color: #ffffff;
+            --carbon-link-primary: #0f62fe;
+            --carbon-border-subtle: #e0e0e0;
+            --carbon-interactive: #0f62fe;
+            --carbon-support-success: #24a148;
+            --carbon-support-warning: #f1c21b;
+            --carbon-support-error: #da1e28;
+            
+            /* Spacing Scale */
+            --space-01: 0.125rem;  /* 2px */
+            --space-02: 0.25rem;   /* 4px */
+            --space-03: 0.5rem;    /* 8px */
+            --space-04: 0.75rem;   /* 12px */
+            --space-05: 1rem;      /* 16px */
+            --space-06: 1.5rem;    /* 24px */
+            --space-07: 2rem;      /* 32px */
+            --space-08: 2.5rem;    /* 40px */
+            --space-09: 3rem;      /* 48px */
+            
+            /* Typography */
+            --font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+        }
+        
+        /* ===== RESET ===== */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        html {
+            font-size: 16px;
+        }
+        
+        body {
+            font-family: var(--font-family);
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: var(--carbon-text-primary);
+            background-color: var(--carbon-background);
+            min-height: 100vh;
+        }
+        
+        /* ===== LAYOUT ===== */
+        .carbon-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .carbon-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 48px;
+            background-color: var(--carbon-gray-100);
+            color: var(--carbon-text-on-color);
+            display: flex;
+            align-items: center;
+            padding: 0 var(--space-05);
+            z-index: 8000;
+        }
+        
+        .carbon-header__name {
+            display: flex;
+            align-items: center;
+            gap: var(--space-03);
+            font-size: 0.875rem;
+            font-weight: 600;
+            letter-spacing: 0.1px;
+        }
+        
+        .carbon-header__name span:first-child {
+            color: var(--carbon-gray-30);
+            font-weight: 400;
+        }
+        
+        .carbon-header__nav {
+            display: flex;
+            margin-left: auto;
+            height: 100%;
+        }
+        
+        .carbon-header__nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0 var(--space-05);
+            color: var(--carbon-gray-30);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: background-color 0.11s;
+        }
+        
+        .carbon-header__nav-link:hover {
+            background-color: var(--carbon-gray-80);
+            color: var(--carbon-text-on-color);
+        }
+        
+        .carbon-header__nav-link.active {
+            color: var(--carbon-text-on-color);
+            background-color: var(--carbon-gray-80);
+        }
+        
+        /* Side Navigation */
+        .carbon-sidenav {
+            position: fixed;
+            top: 48px;
+            left: 0;
+            bottom: 0;
+            width: 256px;
+            background-color: var(--carbon-gray-90);
+            color: var(--carbon-text-on-color);
+            overflow-y: auto;
+            z-index: 7000;
+        }
+        
+        .carbon-sidenav__items {
+            list-style: none;
+            padding: var(--space-05) 0;
+        }
+        
+        .carbon-sidenav__link {
+            display: flex;
+            align-items: center;
+            gap: var(--space-04);
+            padding: var(--space-04) var(--space-05);
+            color: var(--carbon-gray-30);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: background-color 0.11s;
+        }
+        
+        .carbon-sidenav__link:hover {
+            background-color: var(--carbon-gray-80);
+            color: var(--carbon-text-on-color);
+        }
+        
+        .carbon-sidenav__link.active {
+            background-color: var(--carbon-gray-80);
+            color: var(--carbon-text-on-color);
+            border-left: 3px solid var(--carbon-blue-60);
+        }
+        
+        .carbon-sidenav__icon {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+        
+        /* Main Content */
+        .carbon-content {
+            margin-top: 48px;
+            margin-left: 256px;
+            padding: var(--space-06);
+            min-height: calc(100vh - 48px);
+        }
+        
+        /* ===== TYPOGRAPHY ===== */
+        .carbon-heading-01 { font-size: 0.875rem; font-weight: 600; line-height: 1.28; letter-spacing: 0.16px; }
+        .carbon-heading-02 { font-size: 1rem; font-weight: 600; line-height: 1.375; letter-spacing: 0; }
+        .carbon-heading-03 { font-size: 1.25rem; font-weight: 400; line-height: 1.4; letter-spacing: 0; }
+        .carbon-heading-04 { font-size: 1.75rem; font-weight: 400; line-height: 1.28; letter-spacing: 0; }
+        .carbon-heading-05 { font-size: 2rem; font-weight: 400; line-height: 1.25; letter-spacing: 0; }
+        
+        .carbon-body-01 { font-size: 0.875rem; font-weight: 400; line-height: 1.43; letter-spacing: 0.16px; }
+        .carbon-body-02 { font-size: 1rem; font-weight: 400; line-height: 1.5; letter-spacing: 0; }
+        
+        .carbon-label-01 { font-size: 0.75rem; font-weight: 400; line-height: 1.33; letter-spacing: 0.32px; }
+        .carbon-helper-text { font-size: 0.75rem; color: var(--carbon-text-secondary); }
+        
+        /* ===== COMPONENTS ===== */
+        
+        /* Tile */
+        .carbon-tile {
+            background-color: #fff;
+            padding: var(--space-05);
+            min-height: 4rem;
+        }
+        
+        .carbon-tile--clickable {
+            cursor: pointer;
+            transition: background-color 0.11s;
+        }
+        
+        .carbon-tile--clickable:hover {
+            background-color: var(--carbon-background-hover);
+        }
+        
+        /* Button */
+        .carbon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-03);
+            padding: calc(0.875rem - 3px) 64px calc(0.875rem - 3px) 16px;
+            min-height: 48px;
+            font-family: var(--font-family);
+            font-size: 0.875rem;
+            font-weight: 400;
+            line-height: 1.28;
+            letter-spacing: 0.16px;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.11s, border-color 0.11s;
+        }
+        
+        .carbon-btn--primary {
+            background-color: var(--carbon-blue-60);
+            color: var(--carbon-text-on-color);
+        }
+        
+        .carbon-btn--primary:hover {
+            background-color: var(--carbon-blue-70);
+        }
+        
+        .carbon-btn--secondary {
+            background-color: var(--carbon-gray-80);
+            color: var(--carbon-text-on-color);
+        }
+        
+        .carbon-btn--secondary:hover {
+            background-color: var(--carbon-gray-70);
+        }
+        
+        .carbon-btn--tertiary {
+            background-color: transparent;
+            color: var(--carbon-blue-60);
+            border: 1px solid var(--carbon-blue-60);
+        }
+        
+        .carbon-btn--tertiary:hover {
+            background-color: var(--carbon-blue-60);
+            color: var(--carbon-text-on-color);
+        }
+        
+        .carbon-btn--danger {
+            background-color: var(--carbon-red-60);
+            color: var(--carbon-text-on-color);
+        }
+        
+        .carbon-btn--ghost {
+            background-color: transparent;
+            color: var(--carbon-blue-60);
+            padding: calc(0.875rem - 3px) 16px;
+        }
+        
+        .carbon-btn--ghost:hover {
+            background-color: var(--carbon-background-hover);
+        }
+        
+        .carbon-btn--sm {
+            min-height: 32px;
+            padding: calc(0.375rem - 3px) 64px calc(0.375rem - 3px) 16px;
+        }
+        
+        .carbon-btn--icon-only {
+            padding: 0;
+            width: 48px;
+            min-height: 48px;
+        }
+        
+        .carbon-btn:disabled {
+            background-color: var(--carbon-gray-30);
+            color: var(--carbon-gray-50);
+            cursor: not-allowed;
+        }
+        
+        /* Tag */
+        .carbon-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0 var(--space-03);
+            min-height: 24px;
+            font-size: 0.75rem;
+            font-weight: 400;
+            border-radius: 24px;
+        }
+        
+        .carbon-tag--blue { background-color: #d0e2ff; color: #002d9c; }
+        .carbon-tag--green { background-color: #a7f0ba; color: #044317; }
+        .carbon-tag--yellow { background-color: #fddc69; color: #483700; }
+        .carbon-tag--red { background-color: #ffd7d9; color: #750e13; }
+        .carbon-tag--purple { background-color: #e8daff; color: #491d8b; }
+        .carbon-tag--teal { background-color: #9ef0f0; color: #004144; }
+        .carbon-tag--gray { background-color: var(--carbon-gray-20); color: var(--carbon-gray-80); }
+        
+        .carbon-tag--lg {
+            min-height: 32px;
+            padding: 0 var(--space-04);
+            font-size: 0.875rem;
+        }
+        
+        /* Table */
+        .carbon-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+        }
+        
+        .carbon-table th,
+        .carbon-table td {
+            padding: var(--space-05);
+            text-align: left;
+            border-bottom: 1px solid var(--carbon-border-subtle);
+        }
+        
+        .carbon-table th {
+            font-weight: 600;
+            background-color: var(--carbon-gray-10);
+            font-size: 0.875rem;
+        }
+        
+        .carbon-table tr:hover td {
+            background-color: var(--carbon-background-hover);
+        }
+        
+        /* Loading */
+        .carbon-loading {
+            display: inline-block;
+            width: 48px;
+            height: 48px;
+            animation: loading-rotate 1.4s linear infinite;
+        }
+        
+        .carbon-loading--small {
+            width: 16px;
+            height: 16px;
+        }
+        
+        @keyframes loading-rotate {
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Notification/Inline Notification */
+        .carbon-notification {
+            display: flex;
+            gap: var(--space-04);
+            padding: var(--space-05);
+            margin-bottom: var(--space-05);
+        }
+        
+        .carbon-notification--info {
+            background-color: #edf5ff;
+            border-left: 3px solid var(--carbon-blue-60);
+        }
+        
+        .carbon-notification--success {
+            background-color: #defbe6;
+            border-left: 3px solid var(--carbon-green-50);
+        }
+        
+        .carbon-notification--warning {
+            background-color: #fff8e1;
+            border-left: 3px solid var(--carbon-yellow-30);
+        }
+        
+        .carbon-notification--error {
+            background-color: #fff1f1;
+            border-left: 3px solid var(--carbon-red-60);
+        }
+        
+        /* Progress Indicator */
+        .carbon-progress {
+            width: 100%;
+            height: 4px;
+            background-color: var(--carbon-gray-20);
+            overflow: hidden;
+        }
+        
+        .carbon-progress__bar {
+            height: 100%;
+            background-color: var(--carbon-blue-60);
+            transition: width 0.3s ease;
+        }
+        
+        /* ===== GRID ===== */
+        .carbon-grid {
+            display: grid;
+            gap: var(--space-05);
+        }
+        
+        .carbon-grid--cols-2 { grid-template-columns: repeat(2, 1fr); }
+        .carbon-grid--cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .carbon-grid--cols-4 { grid-template-columns: repeat(4, 1fr); }
+        
+        @media (max-width: 768px) {
+            .carbon-sidenav { display: none; }
+            .carbon-content { margin-left: 0; }
+            .carbon-grid--cols-2,
+            .carbon-grid--cols-3,
+            .carbon-grid--cols-4 {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* ===== UTILITIES ===== */
+        .carbon-flex { display: flex; }
+        .carbon-flex--column { flex-direction: column; }
+        .carbon-flex--center { align-items: center; justify-content: center; }
+        .carbon-flex--between { justify-content: space-between; }
+        .carbon-flex--gap { gap: var(--space-05); }
+        
+        .carbon-mt-05 { margin-top: var(--space-05); }
+        .carbon-mt-06 { margin-top: var(--space-06); }
+        .carbon-mt-07 { margin-top: var(--space-07); }
+        .carbon-mb-05 { margin-bottom: var(--space-05); }
+        .carbon-mb-06 { margin-bottom: var(--space-06); }
+        
+        .carbon-text-secondary { color: var(--carbon-text-secondary); }
+        .carbon-text-center { text-align: center; }
+        .carbon-text-right { text-align: right; }
+        
+        /* Status Indicator */
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: var(--space-03);
+        }
+        
+        .status-dot--active { background-color: var(--carbon-green-50); }
+        .status-dot--inactive { background-color: var(--carbon-gray-50); }
+        .status-dot--warning { background-color: var(--carbon-yellow-30); }
+        .status-dot--error { background-color: var(--carbon-red-60); }
+        
+        /* Stat Card */
+        .stat-card {
+            background: #fff;
+            padding: var(--space-05);
+            border-left: 4px solid var(--carbon-blue-60);
+        }
+        
+        .stat-card__value {
+            font-size: 2.5rem;
+            font-weight: 300;
+            line-height: 1.2;
+            color: var(--carbon-text-primary);
+        }
+        
+        .stat-card__label {
+            font-size: 0.875rem;
+            color: var(--carbon-text-secondary);
+            margin-top: var(--space-02);
+        }
+        
+        .stat-card--reguler { border-left-color: var(--carbon-blue-60); }
+        .stat-card--express { border-left-color: var(--carbon-purple-60); }
+        .stat-card--kargo { border-left-color: var(--carbon-teal-50); }
+        
+        /* Package Card */
+        .package-card {
+            background: #fff;
+            padding: var(--space-05);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-03);
+        }
+        
+        .package-card__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .package-card__details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-03);
+        }
+        
+        .package-card__detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .package-card__detail-label {
+            font-size: 0.75rem;
+            color: var(--carbon-text-secondary);
+        }
+        
+        .package-card__detail-value {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="carbon-shell">
+        <!-- Header -->
+        <header class="carbon-header">
+            <div class="carbon-header__name">
+                <span>IBM Carbon</span>
+                <span>Sorting System</span>
+            </div>
+            <nav class="carbon-header__nav">
+                <a href="{{ url_for('main.dashboard') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.dashboard' or request.endpoint == 'main.index' %}active{% endif %}">
+                    Dashboard
+                </a>
+                <a href="{{ url_for('main.history') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.history' %}active{% endif %}">
+                    History
+                </a>
+                <a href="{{ url_for('main.manual') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.manual' %}active{% endif %}">
+                    Manual
+                </a>
+            </nav>
+        </header>
+        
+        <!-- Side Navigation -->
+        <nav class="carbon-sidenav">
+            <ul class="carbon-sidenav__items">
+                <li>
+                    <a href="{{ url_for('main.dashboard') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.dashboard' or request.endpoint == 'main.index' %}active{% endif %}">
+                        <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
+                            <path d="M4 4h10v10H4zM18 4h10v10H18zM4 18h10v10H4zM18 18h10v10H18z"/>
+                        </svg>
+                        Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('main.history') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.history' %}active{% endif %}">
+                        <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
+                            <path d="M16 4A12 12 0 1 0 28 16 12 12 0 0 0 16 4zm0 22a10 10 0 1 1 10-10A10 10 0 0 1 16 26z"/>
+                            <path d="M17 15V9h-2v8h6v-2h-4z"/>
+                        </svg>
+                        History
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('main.manual') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.manual' %}active{% endif %}">
+                        <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
+                            <path d="M28 8H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm0 14H4V10h24z"/>
+                            <path d="M7 19h18v2H7zM7 13h8v2H7z"/>
+                        </svg>
+                        Manual Entry
+                    </a>
+                </li>
+            </ul>
+            
+            <div style="padding: var(--space-05); margin-top: auto; border-top: 1px solid var(--carbon-gray-80);">
+                <div class="carbon-label-01 carbon-text-secondary">System Mode</div>
+                <div class="carbon-body-01" style="margin-top: var(--space-02);">
+                    <span class="status-dot status-dot--active"></span>
+                    {{ status.mode|upper }} Mode
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="carbon-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    
+    <script>
+        // API Helper Functions
+        const API = {
+            async get(endpoint) {
+                const response = await fetch(`/api${endpoint}`);
+                return response.json();
+            },
+            
+            async post(endpoint, data = {}) {
+                const response = await fetch(`/api${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                return response.json();
+            }
+        };
+        
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+        
+        // Format date
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString('id-ID');
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

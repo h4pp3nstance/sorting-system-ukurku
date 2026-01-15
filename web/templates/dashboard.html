@@ -1,0 +1,475 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Sorting System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="carbon-flex carbon-flex--between carbon-mb-06">
+    <div>
+        <h1 class="carbon-heading-04">Dashboard</h1>
+        <p class="carbon-body-01 carbon-text-secondary carbon-mt-05">
+            Monitor pengukuran dan penyortiran paket secara real-time
+        </p>
+    </div>
+    <div>
+        <button id="measureBtn" class="carbon-btn carbon-btn--primary" onclick="triggerMeasurement()">
+            <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+                <path d="M16 4L6 14l1.41 1.41L15 7.83V28h2V7.83l7.59 7.58L26 14 16 4z"/>
+            </svg>
+            Mulai Pengukuran
+        </button>
+    </div>
+</div>
+
+<!-- Status Bar -->
+<div class="carbon-notification carbon-notification--info carbon-mb-06" id="statusBar">
+    <div>
+        <span class="status-dot status-dot--active"></span>
+        <strong>Sistem Ready</strong>
+        <span class="carbon-text-secondary"> — Mode: {{ status.mode|upper }}</span>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="carbon-grid carbon-grid--cols-3 carbon-mb-06">
+    <div class="stat-card stat-card--reguler">
+        <div class="stat-card__value" id="stat-reguler">{{ status.total_today.REGULER }}</div>
+        <div class="stat-card__label">
+            <span class="carbon-tag carbon-tag--blue">REGULER</span>
+            Paket Hari Ini
+        </div>
+    </div>
+    <div class="stat-card stat-card--express">
+        <div class="stat-card__value" id="stat-express">{{ status.total_today.EXPRESS }}</div>
+        <div class="stat-card__label">
+            <span class="carbon-tag carbon-tag--purple">EXPRESS</span>
+            Paket Hari Ini
+        </div>
+    </div>
+    <div class="stat-card stat-card--kargo">
+        <div class="stat-card__value" id="stat-kargo">{{ status.total_today.KARGO }}</div>
+        <div class="stat-card__label">
+            <span class="carbon-tag carbon-tag--teal">KARGO</span>
+            Paket Hari Ini
+        </div>
+    </div>
+</div>
+
+<!-- Last Package -->
+<div class="carbon-mb-06">
+    <h2 class="carbon-heading-03 carbon-mb-05">Paket Terakhir</h2>
+    
+    <div class="package-card" id="lastPackageCard">
+        {% if status.last_package %}
+        <div class="package-card__header">
+            <div>
+                <span class="carbon-heading-02">#{{ status.last_package.id }}</span>
+                <span class="carbon-text-secondary">{{ status.last_package.timestamp }}</span>
+            </div>
+            <span class="carbon-tag carbon-tag--lg 
+                {% if status.last_package.service_type == 'REGULER' %}carbon-tag--blue
+                {% elif status.last_package.service_type == 'EXPRESS' %}carbon-tag--purple
+                {% else %}carbon-tag--teal{% endif %}">
+                {{ status.last_package.service_type }}
+            </span>
+        </div>
+        <div class="package-card__details">
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Dimensi</span>
+                <span class="package-card__detail-value">
+                    {{ status.last_package.dimensions.panjang }} × 
+                    {{ status.last_package.dimensions.lebar }} × 
+                    {{ status.last_package.dimensions.tinggi }} cm
+                </span>
+            </div>
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Berat Aktual</span>
+                <span class="package-card__detail-value">{{ status.last_package.weight.aktual }} g</span>
+            </div>
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Berat Volumetrik</span>
+                <span class="package-card__detail-value">{{ status.last_package.weight.volumetrik }} g</span>
+            </div>
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Chargeable Weight</span>
+                <span class="package-card__detail-value">{{ status.last_package.weight.chargeable }} g</span>
+            </div>
+        </div>
+        <div class="carbon-flex carbon-flex--between carbon-mt-05" style="border-top: 1px solid var(--carbon-border-subtle); padding-top: var(--space-05);">
+            <span class="carbon-label-01 carbon-text-secondary">Biaya Kirim</span>
+            <span class="carbon-heading-03" style="color: var(--carbon-green-50);">
+                Rp {{ "{:,}".format(status.last_package.price) }}
+            </span>
+        </div>
+        {% else %}
+        <div class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
+            <svg width="48" height="48" viewBox="0 0 32 32" fill="currentColor" style="opacity: 0.5;">
+                <path d="M26 30H6a2 2 0 01-2-2V4a2 2 0 012-2h14l8 8v18a2 2 0 01-2 2zM6 4v24h20V12h-6V4zm14 4l4 4h-4z"/>
+            </svg>
+            <p class="carbon-mt-05">Belum ada paket yang diukur</p>
+            <p class="carbon-label-01">Klik "Mulai Pengukuran" untuk memulai</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recent History -->
+<div>
+    <div class="carbon-flex carbon-flex--between carbon-mb-05">
+        <h2 class="carbon-heading-03">Riwayat Terbaru</h2>
+        <a href="{{ url_for('main.history') }}" class="carbon-btn carbon-btn--ghost carbon-btn--sm">
+            Lihat Semua →
+        </a>
+    </div>
+    
+    <table class="carbon-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Waktu</th>
+                <th>Dimensi</th>
+                <th>Berat</th>
+                <th>Layanan</th>
+                <th>Biaya</th>
+            </tr>
+        </thead>
+        <tbody id="historyTable">
+            {% for pkg in history|reverse %}
+            <tr>
+                <td><code>#{{ pkg.id }}</code></td>
+                <td>{{ pkg.timestamp[:19] }}</td>
+                <td>{{ pkg.dimensions.panjang }}×{{ pkg.dimensions.lebar }}×{{ pkg.dimensions.tinggi }} cm</td>
+                <td>{{ pkg.weight.chargeable }}g</td>
+                <td>
+                    <span class="carbon-tag 
+                        {% if pkg.service_type == 'REGULER' %}carbon-tag--blue
+                        {% elif pkg.service_type == 'EXPRESS' %}carbon-tag--purple
+                        {% else %}carbon-tag--teal{% endif %}">
+                        {{ pkg.service_type }}
+                    </span>
+                </td>
+                <td>Rp {{ "{:,}".format(pkg.price) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="carbon-text-center carbon-text-secondary">
+                    Belum ada data paket
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let isRunning = false;
+    
+    async function triggerMeasurement() {
+        if (isRunning) return;
+        
+        const btn = document.getElementById('measureBtn');
+        const statusBar = document.getElementById('statusBar');
+        
+        // Update UI
+        isRunning = true;
+        btn.disabled = true;
+        btn.innerHTML = `
+            <svg class="carbon-loading carbon-loading--small" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="8" fill="none" stroke-dasharray="180 100"/>
+            </svg>
+            Mengukur...
+        `;
+        statusBar.className = 'carbon-notification carbon-notification--warning carbon-mb-06';
+        statusBar.innerHTML = '<div><span class="status-dot status-dot--warning"></span><strong>Sedang Mengukur...</strong></div>';
+        
+        try {
+            const result = await API.post('/measure');
+            
+            if (result.success) {
+                // Success
+                statusBar.className = 'carbon-notification carbon-notification--success carbon-mb-06';
+                statusBar.innerHTML = `<div><span class="status-dot status-dot--active"></span><strong>Paket #${String(result.data.id).padStart(5, '0')} berhasil diukur!</strong> — ${result.data.service_type}</div>`;
+                
+                // Update stats
+                document.getElementById(`stat-${result.data.service_type.toLowerCase()}`).textContent = 
+                    parseInt(document.getElementById(`stat-${result.data.service_type.toLowerCase()}`).textContent) + 1;
+                
+                // Update last package card
+                updateLastPackageCard(result.data);
+                
+                // Add to history table
+                addToHistoryTable(result.data);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            statusBar.className = 'carbon-notification carbon-notification--error carbon-mb-06';
+            statusBar.innerHTML = `<div><span class="status-dot status-dot--error"></span><strong>Error:</strong> ${error.message}</div>`;
+        } finally {
+            isRunning = false;
+            btn.disabled = false;
+            btn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+                    <path d="M16 4L6 14l1.41 1.41L15 7.83V28h2V7.83l7.59 7.58L26 14 16 4z"/>
+                </svg>
+                Mulai Pengukuran
+            `;
+            
+            // Reset status after 3 seconds
+            setTimeout(() => {
+                statusBar.className = 'carbon-notification carbon-notification--info carbon-mb-06';
+                statusBar.innerHTML = '<div><span class="status-dot status-dot--active"></span><strong>Sistem Ready</strong><span class="carbon-text-secondary"> — Siap untuk pengukuran berikutnya</span></div>';
+            }, 3000);
+        }
+    }
+    
+    function updateLastPackageCard(pkg) {
+        const card = document.getElementById('lastPackageCard');
+        const tagClass = {
+            'REGULER': 'carbon-tag--blue',
+            'EXPRESS': 'carbon-tag--purple',
+            'KARGO': 'carbon-tag--teal'
+        }[pkg.service_type];
+        
+        card.innerHTML = `
+            <div class="package-card__header">
+                <div>
+                    <span class="carbon-heading-02">#${String(pkg.id).padStart(5, '0')}</span>
+                    <span class="carbon-text-secondary">${pkg.timestamp}</span>
+                </div>
+                <span class="carbon-tag carbon-tag--lg ${tagClass}">${pkg.service_type}</span>
+            </div>
+            <div class="package-card__details">
+                <div class="package-card__detail-item">
+                    <span class="package-card__detail-label">Dimensi</span>
+                    <span class="package-card__detail-value">${pkg.dimensions.panjang} × ${pkg.dimensions.lebar} × ${pkg.dimensions.tinggi} cm</span>
+                </div>
+                <div class="package-card__detail-item">
+                    <span class="package-card__detail-label">Berat Aktual</span>
+                    <span class="package-card__detail-value">${pkg.weight.aktual} g</span>
+                </div>
+                <div class="package-card__detail-item">
+                    <span class="package-card__detail-label">Berat Volumetrik</span>
+                    <span class="package-card__detail-value">${pkg.weight.volumetrik} g</span>
+                </div>
+                <div class="package-card__detail-item">
+                    <span class="package-card__detail-label">Chargeable Weight</span>
+                    <span class="package-card__detail-value">${pkg.weight.chargeable} g</span>
+                </div>
+            </div>
+            <div class="carbon-flex carbon-flex--between carbon-mt-05" style="border-top: 1px solid var(--carbon-border-subtle); padding-top: var(--space-05);">
+                <span class="carbon-label-01 carbon-text-secondary">Biaya Kirim</span>
+                <span class="carbon-heading-03" style="color: var(--carbon-green-50);">
+                    ${formatCurrency(pkg.price)}
+                </span>
+            </div>
+        `;
+    }
+    
+    function addToHistoryTable(pkg) {
+        const table = document.getElementById('historyTable');
+        const tagClass = {
+            'REGULER': 'carbon-tag--blue',
+            'EXPRESS': 'carbon-tag--purple',
+            'KARGO': 'carbon-tag--teal'
+        }[pkg.service_type];
+        
+        // Remove "no data" row if exists
+        const noDataRow = table.querySelector('tr td[colspan]');
+        if (noDataRow) noDataRow.parentElement.remove();
+        
+        // Add new row at top
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td><code>#${String(pkg.id).padStart(5, '0')}</code></td>
+            <td>${pkg.timestamp.slice(0, 19)}</td>
+            <td>${pkg.dimensions.panjang}×${pkg.dimensions.lebar}×${pkg.dimensions.tinggi} cm</td>
+            <td>${pkg.weight.chargeable}g</td>
+            <td><span class="carbon-tag ${tagClass}">${pkg.service_type}</span></td>
+            <td>${formatCurrency(pkg.price)}</td>
+        `;
+        newRow.style.animation = 'fadeIn 0.3s ease';
+        table.insertBefore(newRow, table.firstChild);
+        
+        // Keep only last 10
+        while (table.children.length > 10) {
+            table.removeChild(table.lastChild);
+        }
+    }
+    
+    // ========================================================================
+    // Real-time Updates via Server-Sent Events (SSE)
+    // ========================================================================
+    
+    let eventSource = null;
+    
+    function setupRealTimeUpdates() {
+        // Check for SSE support
+        if (typeof(EventSource) === 'undefined') {
+            console.warn('SSE not supported, falling back to polling');
+            setupPolling();
+            return;
+        }
+        
+        eventSource = new EventSource('/api/events');
+        
+        eventSource.onopen = () => {
+            console.log('[SSE] Connected to real-time events');
+            updateConnectionStatus(true);
+        };
+        
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleRealTimeEvent(data);
+            } catch (e) {
+                console.error('[SSE] Parse error:', e);
+            }
+        };
+        
+        eventSource.onerror = (err) => {
+            console.error('[SSE] Connection error:', err);
+            updateConnectionStatus(false);
+            
+            // Reconnect after delay
+            setTimeout(() => {
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    setupRealTimeUpdates();
+                }
+            }, 5000);
+        };
+    }
+    
+    function handleRealTimeEvent(data) {
+        console.log('[SSE] Event:', data.event, data);
+        
+        switch (data.event) {
+            case 'package_added':
+                // Update last package card
+                if (data.data.package) {
+                    updateLastPackageCard(data.data.package);
+                }
+                // Update statistics
+                if (data.data.statistics) {
+                    updateStatistics(data.data.statistics.by_type);
+                }
+                // Add to history table
+                if (data.data.package) {
+                    addToHistoryTable(data.data.package);
+                }
+                // Visual notification
+                showNotification('📦 Paket baru terukur: ' + data.data.package.service_type);
+                break;
+                
+            case 'stats_updated':
+                if (data.data.by_type) {
+                    updateStatistics(data.data.by_type);
+                }
+                break;
+                
+            case 'connected':
+                console.log('[SSE] Connected at:', data.timestamp);
+                break;
+        }
+    }
+    
+    function updateLastPackageCard(pkg) {
+        const card = document.getElementById('lastPackageCard');
+        if (!card) return;
+        
+        card.style.animation = 'none';
+        setTimeout(() => {
+            card.style.animation = 'fadeIn 0.3s ease';
+        }, 10);
+        
+        // Update card content (simplified - could be expanded)
+        console.log('Updating last package:', pkg);
+    }
+    
+    function updateStatistics(stats) {
+        if (stats.REGULER !== undefined) {
+            document.getElementById('stat-reguler').textContent = stats.REGULER;
+        }
+        if (stats.EXPRESS !== undefined) {
+            document.getElementById('stat-express').textContent = stats.EXPRESS;
+        }
+        if (stats.KARGO !== undefined) {
+            document.getElementById('stat-kargo').textContent = stats.KARGO;
+        }
+    }
+    
+    function addToHistoryTable(pkg) {
+        const table = document.getElementById('historyTable');
+        if (!table) return;
+        
+        // Create new row
+        const row = document.createElement('tr');
+        row.style.animation = 'fadeIn 0.3s ease';
+        
+        const tagClass = pkg.service_type === 'REGULER' ? 'carbon-tag--blue' :
+                        pkg.service_type === 'EXPRESS' ? 'carbon-tag--purple' : 'carbon-tag--teal';
+        
+        row.innerHTML = `
+            <td><code>#${pkg.id}</code></td>
+            <td>${pkg.timestamp.substring(0, 19)}</td>
+            <td>${pkg.dimensions.panjang}×${pkg.dimensions.lebar}×${pkg.dimensions.tinggi} cm</td>
+            <td>${pkg.weight.chargeable}g</td>
+            <td><span class="carbon-tag ${tagClass}">${pkg.service_type}</span></td>
+            <td>Rp ${pkg.price.toLocaleString()}</td>
+        `;
+        
+        // Insert at beginning
+        table.insertBefore(row, table.firstChild);
+        
+        // Keep max 10 rows visible
+        while (table.children.length > 10) {
+            table.removeChild(table.lastChild);
+        }
+    }
+    
+    function updateConnectionStatus(connected) {
+        // Could add a status indicator to UI
+        console.log('[SSE] Connection status:', connected ? 'connected' : 'disconnected');
+    }
+    
+    function showNotification(message) {
+        // Could implement toast notification
+        console.log('[Notification]', message);
+    }
+    
+    function setupPolling() {
+        // Fallback polling for browsers without SSE support
+        setInterval(async () => {
+            try {
+                const result = await API.get('/status');
+                if (result.success) {
+                    updateStatistics(result.data.statistics);
+                }
+            } catch (e) {
+                console.error('Failed to refresh stats:', e);
+            }
+        }, 5000);
+    }
+    
+    // Initialize real-time updates on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        setupRealTimeUpdates();
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
+</script>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}

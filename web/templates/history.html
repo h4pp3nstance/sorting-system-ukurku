@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}History - Sorting System{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="carbon-flex carbon-flex--between carbon-mb-06">
+    <div>
+        <h1 class="carbon-heading-04">Riwayat Paket</h1>
+        <p class="carbon-body-01 carbon-text-secondary carbon-mt-05">
+            Daftar semua paket yang telah diukur dan disortir
+        </p>
+    </div>
+    <div class="carbon-flex carbon-flex--gap">
+        <select id="filterType" class="carbon-select" onchange="filterPackages()">
+            <option value="">Semua Layanan</option>
+            <option value="REGULER">REGULER</option>
+            <option value="EXPRESS">EXPRESS</option>
+            <option value="KARGO">KARGO</option>
+        </select>
+        <button class="carbon-btn carbon-btn--danger carbon-btn--sm" onclick="resetData()">
+            Reset Data
+        </button>
+    </div>
+</div>
+
+<!-- Statistics Summary -->
+<div class="carbon-grid carbon-grid--cols-4 carbon-mb-06">
+    <div class="stat-card">
+        <div class="stat-card__value" id="totalPackages">{{ packages|length }}</div>
+        <div class="stat-card__label">Total Paket</div>
+    </div>
+    <div class="stat-card stat-card--reguler">
+        <div class="stat-card__value" id="totalReguler">
+            {{ packages|selectattr('service_type', 'equalto', 'REGULER')|list|length }}
+        </div>
+        <div class="stat-card__label">Reguler</div>
+    </div>
+    <div class="stat-card stat-card--express">
+        <div class="stat-card__value" id="totalExpress">
+            {{ packages|selectattr('service_type', 'equalto', 'EXPRESS')|list|length }}
+        </div>
+        <div class="stat-card__label">Express</div>
+    </div>
+    <div class="stat-card stat-card--kargo">
+        <div class="stat-card__value" id="totalKargo">
+            {{ packages|selectattr('service_type', 'equalto', 'KARGO')|list|length }}
+        </div>
+        <div class="stat-card__label">Kargo</div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="carbon-tile">
+    <table class="carbon-table" id="historyTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Waktu</th>
+                <th>Dimensi (P×L×T)</th>
+                <th>Berat Aktual</th>
+                <th>Berat Volumetrik</th>
+                <th>Chargeable</th>
+                <th>Layanan</th>
+                <th>Biaya</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pkg in packages|reverse %}
+            <tr data-type="{{ pkg.service_type }}">
+                <td><code>#{{ pkg.id }}</code></td>
+                <td>{{ pkg.timestamp[:19] }}</td>
+                <td>{{ pkg.dimensions.panjang }} × {{ pkg.dimensions.lebar }} × {{ pkg.dimensions.tinggi }} cm</td>
+                <td>{{ pkg.weight.aktual }} g</td>
+                <td>{{ pkg.weight.volumetrik }} g</td>
+                <td><strong>{{ pkg.weight.chargeable }} g</strong></td>
+                <td>
+                    <span class="carbon-tag 
+                        {% if pkg.service_type == 'REGULER' %}carbon-tag--blue
+                        {% elif pkg.service_type == 'EXPRESS' %}carbon-tag--purple
+                        {% else %}carbon-tag--teal{% endif %}">
+                        {{ pkg.service_type }}
+                    </span>
+                </td>
+                <td>Rp {{ "{:,}".format(pkg.price) }}</td>
+            </tr>
+            {% else %}
+            <tr id="noDataRow">
+                <td colspan="8" class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
+                    <svg width="48" height="48" viewBox="0 0 32 32" fill="currentColor" style="opacity: 0.5;">
+                        <path d="M26 30H6a2 2 0 01-2-2V4a2 2 0 012-2h14l8 8v18a2 2 0 01-2 2zM6 4v24h20V12h-6V4zm14 4l4 4h-4z"/>
+                    </svg>
+                    <p class="carbon-mt-05">Belum ada data paket</p>
+                    <p class="carbon-label-01">Mulai pengukuran dari Dashboard</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Revenue Summary -->
+<div class="carbon-tile carbon-mt-06">
+    <div class="carbon-flex carbon-flex--between">
+        <span class="carbon-heading-03">Total Pendapatan</span>
+        <span class="carbon-heading-03" style="color: var(--carbon-green-50);">
+            Rp {{ "{:,}".format(packages|sum(attribute='price')) }}
+        </span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .carbon-select {
+        padding: var(--space-03) var(--space-05);
+        font-family: var(--font-family);
+        font-size: 0.875rem;
+        background-color: #fff;
+        border: 1px solid var(--carbon-border-subtle);
+        border-bottom: 1px solid var(--carbon-gray-80);
+        cursor: pointer;
+    }
+    
+    .carbon-select:hover {
+        background-color: var(--carbon-background-hover);
+    }
+    
+    .carbon-select:focus {
+        outline: 2px solid var(--carbon-blue-60);
+        outline-offset: -2px;
+    }
+    
+    tr.hidden {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function filterPackages() {
+        const filterValue = document.getElementById('filterType').value;
+        const rows = document.querySelectorAll('#historyTable tbody tr[data-type]');
+        
+        rows.forEach(row => {
+            if (!filterValue || row.dataset.type === filterValue) {
+                row.classList.remove('hidden');
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+    }
+    
+    async function resetData() {
+        if (!confirm('Apakah Anda yakin ingin menghapus semua data? Aksi ini tidak dapat dibatalkan.')) {
+            return;
+        }
+        
+        try {
+            const result = await API.post('/reset');
+            if (result.success) {
+                window.location.reload();
+            } else {
+                alert('Gagal mereset data: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+</script>
+{% endblock %}

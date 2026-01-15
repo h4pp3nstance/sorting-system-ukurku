@@ -1,0 +1,17 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    
+    "packages": {
+      ".indexOn": ["timestamp", "service_type"],
+      ".read": true,
+      ".write": true
+    },
+    
+    "statistics": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
