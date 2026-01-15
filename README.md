@@ -1,10 +1,27 @@
-# Sorting System - Package Measurement and Automatic Sorting
+# 📦 Sorting System - UkurKu
 
-Sistem pengukuran volume dan berat paket serta penyortiran otomatis berbasis Raspberry Pi.
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/h4pp3nstance/sorting-system-ukurku)
+[![Python Tests](https://img.shields.io/badge/tests-211%20passed-brightgreen)](tests/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Smart IoT Package Sorting System with **Firebase Integration** - Raspberry Pi based weight and dimension measurement.
+
+> 🎯 **Sistem pengukuran volume dan berat paket serta penyortiran otomatis** berbasis Raspberry Pi dengan dashboard real-time.
 
 ## 🚀 Quick Start
 
-### 1. Setup Environment
+### Option 1: GitHub Codespaces (Recommended for Demo)
+
+1. Click the **"Open in GitHub Codespaces"** badge above
+2. Wait for environment setup (~2 minutes)
+3. Run the dashboard:
+   ```bash
+   python run_web.py
+   ```
+4. Open the forwarded port (5000) to see the dashboard
+
+### Option 2: Local Development
 
 ```bash
 # Navigate to project
@@ -16,6 +33,9 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Run web dashboard
+python run_web.py
 ```
 
 ### 2. Run in Mock Mode
@@ -31,20 +51,34 @@ python main.py
 ### 3. Run Tests
 
 ```bash
-# Test classification logic
-python -m core.classification
+# Run all 211 tests
+python -m pytest tests/ -v
 
-# Test measurement calculations
-python -m core.measurement
+# Test specific module
+python -m pytest tests/test_api.py -v
 ```
+
+## ✨ Features
+
+- **📊 Real-time Dashboard** - Carbon Design System UI with live updates (SSE)
+- **⚖️ Weight Measurement** - HX711 load cell integration
+- **📐 Dimension Detection** - Camera-based volume calculation
+- **🔥 Firebase Sync** - Cloud database for history & analytics
+- **📝 Logging System** - Rotating file logs with Firebase sync
+- **🧪 Comprehensive Tests** - 211 unit & integration tests
 
 ## 📁 Project Structure
 
 ```
 sorting_system/
+├── .devcontainer/    # GitHub Codespaces configuration
 ├── config/           # Configuration
 │   ├── settings.py   # App settings, GPIO pins, thresholds
-│   └── __init__.py
+│   └── firebase_rules.json  # Firebase database rules
+├── core/             # Business logic
+│   ├── classification.py  # Service type classification
+│   ├── measurement.py     # Volumetric calculation
+│   └── logger.py          # Logging system
 ├── hal/              # Hardware Abstraction Layer
 │   ├── interfaces.py # Abstract interfaces
 │   ├── mock/         # Mock implementations for testing
@@ -52,11 +86,17 @@ sorting_system/
 │   │   ├── mock_camera.py
 │   │   ├── mock_gpio.py
 │   │   └── mock_printer.py
-│   └── real/         # Real hardware implementations (TODO)
-├── core/             # Business logic
-│   ├── classification.py  # Service type classification
-│   └── measurement.py     # Volumetric calculation
+│   └── real/         # Real hardware implementations
+├── storage/          # Data persistence
+│   └── firebase_handler.py  # Firebase CRUD operations
+├── web/              # Flask web application
+│   ├── app.py        # Flask app factory
+│   ├── routes.py     # API endpoints
+│   └── templates/    # Jinja2 HTML templates
+├── tests/            # Unit & integration tests (211 tests)
+├── docs/             # Documentation
 ├── main.py           # Application entry point
+├── run_web.py        # Web server runner
 └── requirements.txt  # Python dependencies
 ```
 
@@ -87,3 +127,21 @@ Edit `config/settings.py` or use environment variables:
 | 18, 19, 20 | Servos |
 | 5, 6, 12, 13 | IR Sensors |
 | 23, 24 | HX711 |
+
+## 🛠️ Tech Stack
+
+- **Backend**: Python 3.11+, Flask 3.0
+- **Frontend**: Carbon Design System (IBM)
+- **Database**: Firebase Realtime Database
+- **Hardware**: Raspberry Pi 4B, HX711, Servo, IR Sensors
+- **Testing**: pytest (211 tests)
+
+## 📖 Documentation
+
+- [Progress Report](docs/PROGRESS_REPORT.md)
+- [Logging Architecture](docs/LOGGING_ARCHITECTURE.md)
+- [Firebase Optimization](docs/firebase_optimization.md)
+
+## 📜 License
+
+MIT License - See [LICENSE](LICENSE) for details.
