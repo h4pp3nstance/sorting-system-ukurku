@@ -3,6 +3,14 @@
 {% block title %}Pengukuran Paket - UkurKu{% endblock %}
 
 {% block content %}
+{% if error %}
+<div class="carbon-notification carbon-notification--error carbon-mb-06">
+    <div>
+        <span class="status-dot status-dot--error"></span>
+        <strong>{{ error }}</strong>
+    </div>
+</div>
+{% endif %}
 <!-- Page Header -->
 <div class="carbon-flex carbon-flex--between carbon-mb-06">
     <div>
@@ -101,6 +109,12 @@
                 Rp {{ "{:,}".format(status.last_package.price) }}
             </span>
         </div>
+        <a href="/receipt/{{ status.last_package.id }}"
+           target="_blank"
+           class="carbon-btn carbon-btn--secondary carbon-mt-05"
+           style="width: 100%;">
+            🖨️ Cetak Resi
+        </a>
         {% else %}
         <div class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
             <svg width="48" height="48" viewBox="0 0 32 32" fill="currentColor" style="opacity: 0.5;">

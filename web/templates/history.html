@@ -63,6 +63,7 @@
                 <th>Chargeable</th>
                 <th>Layanan</th>
                 <th>Biaya</th>
+                <th>Resi</th>
             </tr>
         </thead>
         <tbody>
@@ -83,10 +84,11 @@
                     </span>
                 </td>
                 <td>Rp {{ "{:,}".format(pkg.price) }}</td>
+                <td><a href="/receipt/{{ pkg.id }}" target="_blank" title="Cetak Resi">🖨️</a></td>
             </tr>
             {% else %}
             <tr id="noDataRow">
-                <td colspan="8" class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
+                <td colspan="9" class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
                     <svg width="48" height="48" viewBox="0 0 32 32" fill="currentColor" style="opacity: 0.5;">
                         <path d="M26 30H6a2 2 0 01-2-2V4a2 2 0 012-2h14l8 8v18a2 2 0 01-2 2zM6 4v24h20V12h-6V4zm14 4l4 4h-4z"/>
                     </svg>

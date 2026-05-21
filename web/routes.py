@@ -174,6 +174,63 @@ def history():
                           status=system_status)
 
 
+# Indonesian month names for receipt formatting
+_INDONESIAN_MONTHS = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+]
+
+
+def _format_indonesian_datetime(iso_string):
+    """Format ISO timestamp as '21 Mei 2026, 14:32' (Indonesian)."""
+    if not iso_string:
+        return "-"
+    try:
+        dt = datetime.fromisoformat(iso_string)
+    except (ValueError, TypeError):
+        return str(iso_string)
+    month_name = _INDONESIAN_MONTHS[dt.month - 1]
+    return f"{dt.day} {month_name} {dt.year}, {dt.hour:02d}:{dt.minute:02d}"
+
+
+def _format_indonesian_price(price):
+    """Format price as 'Rp 6.000' with Indonesian thousand separator."""
+    try:
+        amount = float(price or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    return "Rp {:,.0f}".format(amount).replace(",", ".")
+
+
+@main_bp.route('/receipt/<package_id>')
+def receipt(package_id):
+    """Render printable receipt for a package."""
+    storage = get_storage()
+    package = storage.get_package(package_id)
+
+    if not package:
+        return render_template(
+            'dashboard.html',
+            status=system_status,
+            history=[],
+            error="Paket tidak ditemukan"
+        ), 404
+
+    package_display_id = "PKT-" + str(package.get('id', '')).zfill(5)
+    formatted_timestamp = _format_indonesian_datetime(package.get('timestamp'))
+    formatted_price = _format_indonesian_price(package.get('price', 0))
+    printed_at = _format_indonesian_datetime(datetime.now().isoformat())
+
+    return render_template(
+        'receipt.html',
+        package=package,
+        package_display_id=package_display_id,
+        formatted_timestamp=formatted_timestamp,
+        formatted_price=formatted_price,
+        printed_at=printed_at,
+    )
+
+
 @main_bp.route('/manual')
 def manual():
     """Manual measurement page"""
@@ -181,6 +238,8 @@ def manual():
                           status=system_status)
 
 
+# =============================================================================
+# API Endpoints
 # =============================================================================
 # API Endpoints
 # =============================================================================

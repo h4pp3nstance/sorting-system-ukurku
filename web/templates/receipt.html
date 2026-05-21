@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resi Paket {{ package_display_id }} - UkurKu</title>
+    <style>
+        /* ==================================================================
+           RESI PAKET - STANDALONE PRINT-FRIENDLY PAGE
+           Width target ~80mm thermal receipt; readable on A4 too.
+           ================================================================== */
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            background: #f4f4f4;
+            font-family: 'Courier New', 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #161616;
+        }
+
+        .receipt-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 12px;
+            min-height: 100vh;
+        }
+
+        .receipt {
+            width: 80mm;
+            max-width: 100%;
+            background: #fff;
+            padding: 16px 14px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        .receipt h1 {
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .receipt .subtitle {
+            font-size: 11px;
+            text-align: center;
+            color: #525252;
+            margin-bottom: 8px;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px dashed #525252;
+            margin: 8px 0;
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-align: center;
+            margin: 6px 0 4px 0;
+            letter-spacing: 0.5px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 8px;
+            margin: 2px 0;
+        }
+
+        .row .label {
+            color: #393939;
+            white-space: nowrap;
+        }
+
+        .row .value {
+            text-align: right;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .row.total .value {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .footer {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 10px;
+            color: #525252;
+        }
+
+        /* ===== Screen-only controls ===== */
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 18px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 36px;
+            padding: 6px 18px;
+            font-family: inherit;
+            font-size: 13px;
+            text-decoration: none;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: background-color 0.12s, border-color 0.12s;
+        }
+
+        .btn-primary {
+            background: #0f62fe;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #0043ce;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #0f62fe;
+            border-color: #0f62fe;
+        }
+
+        .btn-secondary:hover {
+            background: #edf5ff;
+        }
+
+        .error-box {
+            text-align: center;
+            color: #525252;
+            padding: 16px;
+        }
+
+        /* ===== Print-only rules ===== */
+        @media print {
+            html, body {
+                background: #fff;
+            }
+
+            .receipt-wrapper {
+                padding: 0;
+            }
+
+            .receipt {
+                width: 80mm;
+                border: none;
+                box-shadow: none;
+                padding: 4mm 3mm;
+            }
+
+            .controls,
+            .no-print {
+                display: none !important;
+            }
+
+            @page {
+                margin: 4mm;
+                size: 80mm auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-wrapper">
+        <div class="receipt">
+            <h1>UKURKU</h1>
+            <div class="subtitle">Sorting System</div>
+            <hr class="divider">
+
+            <div class="row">
+                <span class="label">No. Paket</span>
+                <span class="value">{{ package_display_id }}</span>
+            </div>
+            <div class="row">
+                <span class="label">Tanggal</span>
+                <span class="value">{{ formatted_timestamp }}</span>
+            </div>
+            {% if package.measurement_id %}
+            <div class="row">
+                <span class="label">ID Ukur</span>
+                <span class="value">{{ package.measurement_id }}</span>
+            </div>
+            {% endif %}
+
+            <hr class="divider">
+            <div class="section-title">DIMENSI</div>
+            <div class="row">
+                <span class="label">Panjang</span>
+                <span class="value">{{ "%.2f"|format(package.dimensions.panjang) }} cm</span>
+            </div>
+            <div class="row">
+                <span class="label">Lebar</span>
+                <span class="value">{{ "%.2f"|format(package.dimensions.lebar) }} cm</span>
+            </div>
+            <div class="row">
+                <span class="label">Tinggi</span>
+                <span class="value">{{ "%.2f"|format(package.dimensions.tinggi) }} cm</span>
+            </div>
+
+            <hr class="divider">
+            <div class="section-title">BERAT</div>
+            <div class="row">
+                <span class="label">Aktual</span>
+                <span class="value">{{ "%.1f"|format(package.weight.aktual) }} g</span>
+            </div>
+            <div class="row">
+                <span class="label">Volumetrik</span>
+                <span class="value">{{ "%.1f"|format(package.weight.volumetrik) }} g</span>
+            </div>
+            <div class="row">
+                <span class="label">Tagihan</span>
+                <span class="value">{{ "%.1f"|format(package.weight.chargeable) }} g</span>
+            </div>
+            {% if package.weight.source %}
+            <div class="row">
+                <span class="label">Sumber</span>
+                <span class="value">{{ package.weight.source }}</span>
+            </div>
+            {% endif %}
+
+            <hr class="divider">
+            <div class="section-title">LAYANAN</div>
+            <div class="row">
+                <span class="label">Jenis</span>
+                <span class="value">{{ package.service_type }}</span>
+            </div>
+            <div class="row total">
+                <span class="label">Biaya</span>
+                <span class="value">{{ formatted_price }}</span>
+            </div>
+
+            <hr class="divider">
+            <div class="footer">
+                Dicetak: {{ printed_at }}<br>
+                Terima kasih
+            </div>
+        </div>
+
+        <div class="controls no-print">
+            <button type="button" class="btn btn-primary" onclick="window.print()">
+                Cetak
+            </button>
+            <a href="/dashboard" class="btn btn-secondary">Kembali</a>
+        </div>
+    </div>
+
+    <script>
+        // Auto-trigger print dialog after the page renders.
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                try { window.print(); } catch (e) { /* ignore */ }
+            }, 250);
+        });
+    </script>
+</body>
+</html>
