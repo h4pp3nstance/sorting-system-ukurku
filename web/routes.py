@@ -7,10 +7,13 @@ With Firebase Integration, Real-time Updates, and Logging
 from flask import Blueprint, render_template, jsonify, request, Response
 from datetime import datetime
 import json
-import os
-import time
 import queue
 import threading
+
+from web.measurement_bridge import (
+    should_use_file_bridge, get_measurement_from_file,
+    classify_package, MeasurementBridgeError
+)
 
 # Import logger
 try:
@@ -213,59 +216,89 @@ def trigger_measurement():
     system_status['is_running'] = True
     
     try:
-        # Import and run measurement (mock or real based on config)
-        from config.settings import is_mock_mode
+        from config.settings import (
+            is_mock_mode, HARDWARE_MODE, MEASUREMENT_MODE,
+            MEASUREMENT_SOURCE_PATH, PROGRAM_PYTHON_BASE,
+            MEASUREMENT_MAX_AGE_SECONDS
+        )
+
         storage = get_storage()
-        
-        if is_mock_mode():
-            # Generate mock data
+        use_file = should_use_file_bridge(HARDWARE_MODE, MEASUREMENT_MODE)
+
+        if use_file:
+            result = get_measurement_from_file(
+                MEASUREMENT_SOURCE_PATH,
+                PROGRAM_PYTHON_BASE,
+                MEASUREMENT_MAX_AGE_SECONDS
+            )
+
+            service_type, price = classify_package(result.chargeable_weight)
+
+            package_data = {
+                'dimensions': {
+                    'panjang': result.panjang,
+                    'lebar': result.lebar,
+                    'tinggi': result.tinggi
+                },
+                'weight': {
+                    'aktual': result.berat_aktual,
+                    'volumetrik': result.berat_volumetrik,
+                    'chargeable': result.chargeable_weight,
+                    'source': result.chargeable_source
+                },
+                'measurement_id': result.measurement_id,
+                'service_type': service_type,
+                'price': price,
+                'detection_image': result.detection_image,
+                'synced_to_firebase': _use_firebase,
+                'data_source': 'file_bridge'
+            }
+
+            package_id = storage.save_package(package_data)
+
+            log.operation("Package measured (file bridge)",
+                package_id=package_id,
+                measurement_id=result.measurement_id,
+                service_type=service_type,
+                weight=result.chargeable_weight,
+                price=price,
+                synced=_use_firebase)
+
+            package = {
+                'id': package_id,
+                'timestamp': result.timestamp,
+                **package_data
+            }
+
+            system_status['last_package'] = package
+            system_status['total_today'][service_type] += 1
+
+            broadcast_event('package_added', {
+                'package': package,
+                'statistics': {
+                    'total_today': sum(system_status['total_today'].values()),
+                    'by_type': dict(system_status['total_today'])
+                }
+            })
+
+            return jsonify({
+                'success': True,
+                'data': package
+            })
+
+        elif is_mock_mode():
             import random
-            
+
             panjang = round(random.uniform(5, 23), 1)
             lebar = round(random.uniform(5, 23), 1)
             tinggi = round(random.uniform(5, 23), 1)
             berat_aktual = round(random.uniform(50, 2000), 1)
             berat_volumetrik = round((panjang * lebar * tinggi) / 6000 * 1000, 1)
             chargeable = max(berat_aktual, berat_volumetrik)
-            
-            # Classify
-            if chargeable <= 700:
-                service_type = 'REGULER'
-                price = 6000
-            elif chargeable <= 1300:
-                service_type = 'EXPRESS'
-                price = 12000
-            else:
-                service_type = 'KARGO'
-                price = 5000
-            
-            # Prepare package data for storage
+
+            service_type, price = classify_package(chargeable)
+
             package_data = {
-                'panjang': panjang,
-                'lebar': lebar,
-                'tinggi': tinggi,
-                'berat_aktual': berat_aktual,
-                'berat_volumetrik': berat_volumetrik,
-                'chargeable_weight': chargeable,
-                'service_type': service_type,
-                'price': price
-            }
-            
-            # Save to storage (Firebase or memory)
-            package_id = storage.save_package(package_data)
-            
-            # Log the operation
-            log.operation("Package measured",
-                package_id=package_id,
-                service_type=service_type,
-                weight=chargeable,
-                price=price,
-                synced=_use_firebase)
-            
-            # Format response
-            package = {
-                'id': package_id,
-                'timestamp': datetime.now().isoformat(),
                 'dimensions': {
                     'panjang': panjang,
                     'lebar': lebar,
@@ -278,14 +311,28 @@ def trigger_measurement():
                 },
                 'service_type': service_type,
                 'price': price,
-                'synced_to_firebase': _use_firebase
+                'synced_to_firebase': _use_firebase,
+                'data_source': 'mock'
             }
-            
-            # Update runtime status
+
+            package_id = storage.save_package(package_data)
+
+            log.operation("Package measured (mock)",
+                package_id=package_id,
+                service_type=service_type,
+                weight=chargeable,
+                price=price,
+                synced=_use_firebase)
+
+            package = {
+                'id': package_id,
+                'timestamp': datetime.now().isoformat(),
+                **package_data
+            }
+
             system_status['last_package'] = package
             system_status['total_today'][service_type] += 1
-            
-            # Broadcast real-time event to connected clients
+
             broadcast_event('package_added', {
                 'package': package,
                 'statistics': {
@@ -293,24 +340,31 @@ def trigger_measurement():
                     'by_type': dict(system_status['total_today'])
                 }
             })
-            
+
             return jsonify({
                 'success': True,
                 'data': package
             })
+
         else:
-            # Real hardware measurement
-            log.warning("Real hardware mode not implemented")
             return jsonify({
                 'success': False,
-                'error': 'Real hardware mode not implemented yet'
+                'error': 'Mode pengukuran tidak dikenali. '
+                         'Set MEASUREMENT_MODE=file atau MEASUREMENT_MODE=mock.'
             }), 501
             
+    except MeasurementBridgeError as e:
+        log.warning("Measurement bridge error", error=str(e))
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'error_type': 'measurement_bridge'
+        }), 422
     except Exception as e:
         log.error("Measurement failed", exception=e)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Terjadi kesalahan sistem. Silakan coba lagi.'
         }), 500
     finally:
         system_status['is_running'] = False
@@ -450,7 +504,7 @@ def broadcast_event(event_type: str, data: dict):
                     'data': data,
                     'timestamp': datetime.now().isoformat()
                 })
-            except:
+            except Exception:
                 dead_queues.append(q)
         
         # Remove disconnected clients
@@ -491,7 +545,7 @@ def stream_events():
                     yield f"data: {json.dumps(event)}\n\n"
                 except queue.Empty:
                     # Send keepalive ping
-                    yield f": keepalive\n\n"
+                    yield ": keepalive\n\n"
                     
         finally:
             with _event_lock:

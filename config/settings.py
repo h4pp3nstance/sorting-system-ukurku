@@ -6,6 +6,9 @@ import os
 from enum import Enum
 
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 class HardwareMode(Enum):
     """Hardware operation mode"""
     MOCK = "mock"
@@ -94,9 +97,65 @@ FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL", "")
 
 
 # ============================================================
+# MEASUREMENT SOURCE (File-based Integration Bridge)
+# ============================================================
+
+def _find_program_python_base():
+    """
+    Auto-detect program-python base directory.
+    Priority:
+    1. Environment variable PROGRAM_PYTHON_BASE
+    2. Sibling folder ../program-python
+    3. $HOME/program-python
+    4. Empty string (not found)
+    """
+    # 1. Check environment variable
+    env_path = os.getenv("PROGRAM_PYTHON_BASE", "").strip()
+    if env_path:
+        return os.path.abspath(os.path.expanduser(env_path))
+    
+    # 2. Check sibling folder
+    sibling_path = os.path.abspath(os.path.join(BASE_DIR, "..", "program-python"))
+    if os.path.isdir(sibling_path):
+        return sibling_path
+    
+    # 3. Check home directory
+    home_path = os.path.join(os.path.expanduser("~"), "program-python")
+    if os.path.isdir(home_path):
+        return home_path
+    
+    # 4. Not found
+    return ""
+
+
+# Base path program-python untuk resolve relative image paths
+PROGRAM_PYTHON_BASE = _find_program_python_base()
+
+# Path ke file JSON hasil pengukuran dari program-python (tahap14)
+# Set via environment variable atau gunakan default path
+_measurement_source_env = os.getenv("MEASUREMENT_SOURCE_PATH", "").strip()
+if _measurement_source_env:
+    MEASUREMENT_SOURCE_PATH = os.path.abspath(os.path.expanduser(_measurement_source_env))
+elif PROGRAM_PYTHON_BASE:
+    MEASUREMENT_SOURCE_PATH = os.path.join(
+        PROGRAM_PYTHON_BASE,
+        "hasil_tahap14",
+        "latest_integrated_chargeable.json",
+    )
+else:
+    MEASUREMENT_SOURCE_PATH = ""
+
+# Mode pengukuran: "mock" = data acak, "file" = baca dari JSON tahap14
+# Jika HARDWARE_MODE=real dan MEASUREMENT_MODE tidak di-set, default ke "file"
+MEASUREMENT_MODE = os.getenv("MEASUREMENT_MODE", "auto")
+
+# Batas umur data (detik) - jika file lebih tua dari ini, dianggap stale
+MEASUREMENT_MAX_AGE_SECONDS = int(os.getenv("MEASUREMENT_MAX_AGE_SECONDS", "300"))
+
+
+# ============================================================
 # PATHS
 # ============================================================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 TEST_IMAGES_DIR = os.path.join(ASSETS_DIR, "test_images")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
