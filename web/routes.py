@@ -14,6 +14,9 @@ from web.measurement_bridge import (
     should_use_file_bridge, get_measurement_from_file,
     classify_package, MeasurementBridgeError
 )
+from web.mode_helper import get_system_mode_info
+
+_MODE_INFO = get_system_mode_info()
 
 # Import logger
 try:
@@ -122,7 +125,8 @@ class InMemoryStorage:
 
 # System status (always in-memory for runtime state)
 system_status = {
-    'mode': 'mock',
+    'mode': _MODE_INFO['mode_id'],
+    'mode_info': _MODE_INFO,
     'is_running': False,
     'last_package': None,
     'total_today': {
@@ -191,6 +195,7 @@ def get_status():
         'success': True,
         'data': {
             'mode': system_status['mode'],
+            'mode_info': system_status['mode_info'],
             'is_running': system_status['is_running'],
             'last_package': system_status['last_package'],
             'statistics': stats.get('by_service_type', system_status['total_today']),

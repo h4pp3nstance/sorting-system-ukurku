@@ -594,8 +594,8 @@
             <div style="padding: var(--space-05); margin-top: auto; border-top: 1px solid var(--carbon-gray-80);">
                 <div class="carbon-label-01 carbon-text-secondary">Mode Sistem</div>
                 <div class="carbon-body-01" style="margin-top: var(--space-02);">
-                    <span class="status-dot status-dot--active"></span>
-                    {{ status.mode|upper }} Mode
+                    <span class="status-dot {{ status.mode_info.dot_class }}"></span>
+                    {{ status.mode_info.label }}
                 </div>
             </div>
         </nav>

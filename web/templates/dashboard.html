@@ -24,9 +24,9 @@
 <!-- Status Bar -->
 <div class="carbon-notification carbon-notification--info carbon-mb-06" id="statusBar">
     <div>
-        <span class="status-dot status-dot--active"></span>
+        <span class="status-dot {{ status.mode_info.dot_class }}"></span>
         <strong>Sistem Siap</strong>
-        <span class="carbon-text-secondary"> — Mode: {{ status.mode|upper }}</span>
+        <span class="carbon-text-secondary"> — {{ status.mode_info.description }}</span>
     </div>
 </div>
 

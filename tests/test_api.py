@@ -60,7 +60,7 @@ class TestWebAPI:
         data = json.loads(response.data)
         
         assert 'mode' in data['data']
-        assert data['data']['mode'] in ['mock', 'real']
+        assert data['data']['mode'] in ['mock', 'real', 'file', 'unknown']
     
     def test_status_contains_statistics(self, client):
         """Test status contains statistics"""
