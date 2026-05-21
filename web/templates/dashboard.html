@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Sorting System{% endblock %}
+{% block title %}Pengukuran Paket - UkurKu{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
 <div class="carbon-flex carbon-flex--between carbon-mb-06">
     <div>
-        <h1 class="carbon-heading-04">Dashboard</h1>
+        <h1 class="carbon-heading-04">Pengukuran Paket</h1>
         <p class="carbon-body-01 carbon-text-secondary carbon-mt-05">
-            Monitor pengukuran dan penyortiran paket secara real-time
+            Pantau hasil ukur paket dari mesin dan tentukan berat tagihan secara otomatis
         </p>
     </div>
     <div>
@@ -16,7 +16,7 @@
             <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
                 <path d="M16 4L6 14l1.41 1.41L15 7.83V28h2V7.83l7.59 7.58L26 14 16 4z"/>
             </svg>
-            Mulai Pengukuran
+            Ambil Hasil Pengukuran
         </button>
     </div>
 </div>
@@ -25,7 +25,7 @@
 <div class="carbon-notification carbon-notification--info carbon-mb-06" id="statusBar">
     <div>
         <span class="status-dot status-dot--active"></span>
-        <strong>Sistem Ready</strong>
+        <strong>Sistem Siap</strong>
         <span class="carbon-text-secondary"> — Mode: {{ status.mode|upper }}</span>
     </div>
 </div>
@@ -91,7 +91,7 @@
                 <span class="package-card__detail-value">{{ status.last_package.weight.volumetrik }} g</span>
             </div>
             <div class="package-card__detail-item">
-                <span class="package-card__detail-label">Chargeable Weight</span>
+                <span class="package-card__detail-label">Berat Tagihan</span>
                 <span class="package-card__detail-value">{{ status.last_package.weight.chargeable }} g</span>
             </div>
         </div>
@@ -107,7 +107,7 @@
                 <path d="M26 30H6a2 2 0 01-2-2V4a2 2 0 012-2h14l8 8v18a2 2 0 01-2 2zM6 4v24h20V12h-6V4zm14 4l4 4h-4z"/>
             </svg>
             <p class="carbon-mt-05">Belum ada paket yang diukur</p>
-            <p class="carbon-label-01">Klik "Mulai Pengukuran" untuk memulai</p>
+            <p class="carbon-label-01">Jalankan mesin ukur, lalu klik "Ambil Hasil Pengukuran"</p>
         </div>
         {% endif %}
     </div>
@@ -179,10 +179,10 @@
             <svg class="carbon-loading carbon-loading--small" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="8" fill="none" stroke-dasharray="180 100"/>
             </svg>
-            Mengukur...
+            Mengambil hasil...
         `;
         statusBar.className = 'carbon-notification carbon-notification--warning carbon-mb-06';
-        statusBar.innerHTML = '<div><span class="status-dot status-dot--warning"></span><strong>Sedang Mengukur...</strong></div>';
+        statusBar.innerHTML = '<div><span class="status-dot status-dot--warning"></span><strong>Sedang mengambil hasil pengukuran...</strong></div>';
         
         try {
             const result = await API.post('/measure');
@@ -190,7 +190,7 @@
             if (result.success) {
                 // Success
                 statusBar.className = 'carbon-notification carbon-notification--success carbon-mb-06';
-                statusBar.innerHTML = `<div><span class="status-dot status-dot--active"></span><strong>Paket #${String(result.data.id).padStart(5, '0')} berhasil diukur!</strong> — ${result.data.service_type}</div>`;
+                statusBar.innerHTML = `<div><span class="status-dot status-dot--active"></span><strong>Hasil paket #${String(result.data.id).padStart(5, '0')} berhasil ditampilkan!</strong> — ${result.data.service_type}</div>`;
                 
                 // Update stats
                 document.getElementById(`stat-${result.data.service_type.toLowerCase()}`).textContent = 
@@ -214,13 +214,13 @@
                 <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
                     <path d="M16 4L6 14l1.41 1.41L15 7.83V28h2V7.83l7.59 7.58L26 14 16 4z"/>
                 </svg>
-                Mulai Pengukuran
+                Ambil Hasil Pengukuran
             `;
             
             // Reset status after 3 seconds
             setTimeout(() => {
                 statusBar.className = 'carbon-notification carbon-notification--info carbon-mb-06';
-                statusBar.innerHTML = '<div><span class="status-dot status-dot--active"></span><strong>Sistem Ready</strong><span class="carbon-text-secondary"> — Siap untuk pengukuran berikutnya</span></div>';
+                statusBar.innerHTML = '<div><span class="status-dot status-dot--active"></span><strong>Sistem Siap</strong><span class="carbon-text-secondary"> — Siap menampilkan hasil berikutnya</span></div>';
             }, 3000);
         }
     }
@@ -255,7 +255,7 @@
                     <span class="package-card__detail-value">${pkg.weight.volumetrik} g</span>
                 </div>
                 <div class="package-card__detail-item">
-                    <span class="package-card__detail-label">Chargeable Weight</span>
+                    <span class="package-card__detail-label">Berat Tagihan</span>
                     <span class="package-card__detail-value">${pkg.weight.chargeable} g</span>
                 </div>
             </div>

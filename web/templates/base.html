@@ -544,18 +544,18 @@
         <!-- Header -->
         <header class="carbon-header">
             <div class="carbon-header__name">
-                <span>IBM Carbon</span>
-                <span>Sorting System</span>
+                <span>UkurKu</span>
+                <span>Dashboard Pengukuran Paket</span>
             </div>
             <nav class="carbon-header__nav">
                 <a href="{{ url_for('main.dashboard') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.dashboard' or request.endpoint == 'main.index' %}active{% endif %}">
-                    Dashboard
+                    Pengukuran
                 </a>
                 <a href="{{ url_for('main.history') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.history' %}active{% endif %}">
-                    History
+                    Riwayat
                 </a>
                 <a href="{{ url_for('main.manual') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.manual' %}active{% endif %}">
-                    Manual
+                    Input Manual
                 </a>
             </nav>
         </header>
@@ -568,7 +568,7 @@
                         <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
                             <path d="M4 4h10v10H4zM18 4h10v10H18zM4 18h10v10H4zM18 18h10v10H18z"/>
                         </svg>
-                        Dashboard
+                        Pengukuran
                     </a>
                 </li>
                 <li>
@@ -577,7 +577,7 @@
                             <path d="M16 4A12 12 0 1 0 28 16 12 12 0 0 0 16 4zm0 22a10 10 0 1 1 10-10A10 10 0 0 1 16 26z"/>
                             <path d="M17 15V9h-2v8h6v-2h-4z"/>
                         </svg>
-                        History
+                        Riwayat
                     </a>
                 </li>
                 <li>
@@ -586,13 +586,13 @@
                             <path d="M28 8H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm0 14H4V10h24z"/>
                             <path d="M7 19h18v2H7zM7 13h8v2H7z"/>
                         </svg>
-                        Manual Entry
+                        Input Manual
                     </a>
                 </li>
             </ul>
             
             <div style="padding: var(--space-05); margin-top: auto; border-top: 1px solid var(--carbon-gray-80);">
-                <div class="carbon-label-01 carbon-text-secondary">System Mode</div>
+                <div class="carbon-label-01 carbon-text-secondary">Mode Sistem</div>
                 <div class="carbon-body-01" style="margin-top: var(--space-02);">
                     <span class="status-dot status-dot--active"></span>
                     {{ status.mode|upper }} Mode
