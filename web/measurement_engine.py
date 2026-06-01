@@ -217,9 +217,10 @@ def get_current_weight():
     Dipakai polling autopilot. Return None bila sesi belum aktif (tidak
     membuka sesi sendiri, supaya polling tidak memicu init kamera).
     """
-    if not is_session_active():
-        return None
     with _session_lock:
+        # TOCTOU: cek None di dalam lock supaya tidak race dengan Disconnect.
+        if _session is None:
+            return None
         with _chdir_base():
             return _session.read_weight()
 

@@ -330,9 +330,30 @@ def api_login_required(view):
     return wrapped
 
 
-# =============================================================================
-# Auth blueprint (login / logout)
-# =============================================================================
+def api_role_required(*roles):
+    """Like role_required but returns JSON 401/403 instead of redirecting."""
+    from flask import jsonify
+
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if current_app.config.get("TESTING"):
+                return view(*args, **kwargs)
+            if not is_authenticated():
+                return jsonify({
+                    "success": False,
+                    "error": "Tidak terautentikasi. Silakan masuk kembali.",
+                    "error_type": "auth",
+                }), 401
+            if current_user().get("role") not in roles:
+                return jsonify({
+                    "success": False,
+                    "error": "Anda tidak memiliki akses untuk tindakan ini.",
+                    "error_type": "forbidden",
+                }), 403
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
 
 auth_bp = Blueprint("auth", __name__)
 

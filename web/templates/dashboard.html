@@ -643,35 +643,6 @@
         }
     }
     
-    function addToHistoryTable(pkg) {
-        const table = document.getElementById('historyTable');
-        if (!table) return;
-        
-        // Create new row
-        const row = document.createElement('tr');
-        row.style.animation = 'fadeIn 0.3s ease';
-        
-        const tagClass = pkg.service_type === 'REGULER' ? 'carbon-tag--blue' :
-                        pkg.service_type === 'EXPRESS' ? 'carbon-tag--purple' : 'carbon-tag--teal';
-        
-        row.innerHTML = `
-            <td><code>#${pkg.id}</code></td>
-            <td>${pkg.timestamp.substring(0, 19)}</td>
-            <td>${pkg.dimensions.panjang}×${pkg.dimensions.lebar}×${pkg.dimensions.tinggi} cm</td>
-            <td>${pkg.weight.chargeable}g</td>
-            <td><span class="carbon-tag ${tagClass}">${pkg.service_type}</span></td>
-            <td>Rp ${pkg.price.toLocaleString()}</td>
-        `;
-        
-        // Insert at beginning
-        table.insertBefore(row, table.firstChild);
-        
-        // Keep max 10 rows visible
-        while (table.children.length > 10) {
-            table.removeChild(table.lastChild);
-        }
-    }
-    
     function updateConnectionStatus(connected) {
         // Could add a status indicator to UI
         console.log('[SSE] Connection status:', connected ? 'connected' : 'disconnected');

@@ -16,7 +16,7 @@ from web.measurement_bridge import (
 )
 from web.mode_helper import get_system_mode_info
 from web.auth import (
-    role_required, api_login_required, current_user,
+    role_required, api_login_required, api_role_required, current_user,
     ROLE_MITRA, ROLE_MPC, ROLE_ADMIN,
 )
 
@@ -1102,9 +1102,9 @@ def get_statistics():
 
 
 @api_bp.route('/reset', methods=['POST'])
-@api_login_required
+@api_role_required(ROLE_ADMIN)
 def reset_statistics():
-    """Reset daily statistics (for testing)"""
+    """Reset daily statistics (admin only: menghapus data semua mitra)"""
     global system_status
     
     storage = get_storage()
