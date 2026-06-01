@@ -30,6 +30,9 @@
             </svg>
             Ambil Hasil Pengukuran
         </button>
+        <button id="autopilotBtn" class="carbon-btn carbon-btn--secondary" onclick="toggleAutopilot()">
+            Mulai Autopilot
+        </button>
     </div>
 </div>
 
@@ -256,6 +259,8 @@
     async function toggleHardware() {
         const btn = document.getElementById('connectBtn');
         const statusBar = document.getElementById('statusBar');
+        // Disconnect saat autopilot jalan -> hentikan autopilot dulu.
+        if (hwConnected && autopilotOn) { stopAutopilot(); }
         btn.disabled = true;
         const endpoint = hwConnected ? '/hardware/disconnect' : '/hardware/connect';
         try {
@@ -274,6 +279,117 @@
         } finally {
             btn.disabled = false;
         }
+    }
+
+    // ===================== AUTOPILOT =====================
+    let autopilotOn = false;
+    let autopilotBusy = false;
+    let autopilotState = 'idle';
+    let removeConfirm = 0;
+    let autopilotTimer = null;
+    const AP_MIN_WEIGHT = 50;      // gram, sama dengan MIN_VALID_ACTUAL_WEIGHT_G
+    const AP_REMOVE_CONFIRM = 2;   // poll berturut berat<min = paket diangkat
+    const AP_POLL_MS = 2000;       // polling lambat (stabil dulu, bisa dituning)
+
+    function apStatus(text, cls) {
+        const bar = document.getElementById('statusBar');
+        bar.className = 'carbon-notification carbon-notification--' + cls + ' carbon-mb-06';
+        const dot = cls === 'success' ? 'active' : (cls === 'error' ? 'error' : 'warning');
+        bar.innerHTML = '<div><span class="status-dot status-dot--' + dot +
+            '"></span><strong>AUTOPILOT</strong> — ' + text + '</div>';
+    }
+
+    function namesFilled() {
+        return document.getElementById('sender_nama').value.trim() &&
+               document.getElementById('recipient_nama').value.trim();
+    }
+
+    function resetForm() {
+        ['sender_nama','sender_telepon','sender_alamat',
+         'recipient_nama','recipient_telepon','recipient_alamat']
+            .forEach(id => { document.getElementById(id).value = ''; });
+    }
+
+    async function autopilotTick() {
+        if (!autopilotOn || autopilotBusy) return;
+        autopilotBusy = true;
+        try {
+            const w = await API.get('/hardware/weight');
+            if (!w.success || !w.data.connected) {
+                apStatus('Hardware terlepas — autopilot berhenti.', 'error');
+                stopAutopilot();
+                return;
+            }
+            const berat = w.data.weight_g || 0;
+
+            if (autopilotState === 'waiting') {
+                if (!namesFilled()) {
+                    apStatus('MENUNGGU — ketik nama pengirim & penerima.', 'info');
+                } else if (berat < AP_MIN_WEIGHT) {
+                    apStatus('SIAP — letakkan paket di alat (berat ' + berat + ' g).', 'info');
+                } else {
+                    apStatus('MENGUKUR DATA FINAL... mohon tunggu.', 'warning');
+                    const payload = {
+                        sender: { nama: document.getElementById('sender_nama').value.trim(),
+                                  telepon: document.getElementById('sender_telepon').value.trim(),
+                                  alamat: document.getElementById('sender_alamat').value.trim() },
+                        recipient: { nama: document.getElementById('recipient_nama').value.trim(),
+                                     telepon: document.getElementById('recipient_telepon').value.trim(),
+                                     alamat: document.getElementById('recipient_alamat').value.trim() }
+                    };
+                    const r = await API.post('/measure', payload);
+                    if (r.success) {
+                        autopilotState = 'wait_removal';
+                        removeConfirm = 0;
+                        apStatus('DATA FINAL TERSIMPAN - AMBIL PAKET (#' + r.data.id + ').', 'success');
+                        // TODO(servo): dorong paket ke konveyor di sini (Fase hardware).
+                    } else {
+                        apStatus('Gagal: ' + (r.error || 'tidak diketahui') + '. Coba lagi.', 'error');
+                    }
+                }
+            } else if (autopilotState === 'wait_removal') {
+                if (berat < AP_MIN_WEIGHT) {
+                    removeConfirm++;
+                    apStatus('MENUNGGU PAKET DIANGKAT ' + removeConfirm + '/' + AP_REMOVE_CONFIRM, 'warning');
+                    if (removeConfirm >= AP_REMOVE_CONFIRM) {
+                        resetForm();
+                        autopilotState = 'waiting';
+                        removeConfirm = 0;
+                        apStatus('Paket diangkat. Ketik nama paket berikutnya.', 'info');
+                    }
+                } else {
+                    removeConfirm = 0;
+                    apStatus('DATA FINAL TERSIMPAN - AMBIL PAKET.', 'success');
+                }
+            }
+        } catch (e) {
+            apStatus('Error polling: ' + e.message, 'error');
+        } finally {
+            autopilotBusy = false;
+        }
+    }
+
+    function stopAutopilot() {
+        autopilotOn = false;
+        autopilotState = 'idle';
+        if (autopilotTimer) { clearInterval(autopilotTimer); autopilotTimer = null; }
+        document.getElementById('autopilotBtn').textContent = 'Mulai Autopilot';
+        document.getElementById('measureBtn').disabled = false;
+    }
+
+    async function toggleAutopilot() {
+        if (autopilotOn) { stopAutopilot(); apStatus('Autopilot dihentikan.', 'info'); return; }
+        if (!hwConnected) {
+            apStatus('Connect Hardware dulu sebelum autopilot.', 'error');
+            return;
+        }
+        autopilotOn = true;
+        autopilotState = 'waiting';
+        removeConfirm = 0;
+        document.getElementById('autopilotBtn').textContent = 'Stop Autopilot';
+        document.getElementById('measureBtn').disabled = true;  // hindari bentrok manual
+        apStatus('Autopilot aktif. Ketik nama & letakkan paket.', 'info');
+        autopilotTimer = setInterval(autopilotTick, AP_POLL_MS);
     }
 
     async function triggerMeasurement() {

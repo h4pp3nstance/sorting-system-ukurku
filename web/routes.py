@@ -1162,6 +1162,25 @@ def hardware_disconnect():
     return jsonify({'success': True, 'data': result,
                     'message': 'Hardware dilepas. Program lain boleh memakai kamera/sensor.'})
 
+
+@api_bp.route('/hardware/weight', methods=['GET'])
+@api_login_required
+def hardware_weight():
+    """Baca berat loadcell saat ini (gram) untuk polling autopilot.
+
+    connected=False jika sesi belum aktif (hardware belum di-Connect).
+    """
+    try:
+        from web.measurement_engine import get_current_weight
+        weight = get_current_weight()
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    if weight is None:
+        return jsonify({'success': True,
+                        'data': {'connected': False, 'weight_g': None}})
+    return jsonify({'success': True,
+                    'data': {'connected': True, 'weight_g': round(weight, 1)}})
+
 # =============================================================================
 # Server-Sent Events (SSE) for Real-time Updates
 # =============================================================================
