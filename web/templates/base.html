@@ -700,6 +700,11 @@
         </main>
     </div>
     
+    <style>
+        th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+        th.sortable:hover { background-color: var(--carbon-background-hover); }
+        .sort-indicator { font-size: 0.75em; opacity: 0.85; margin-left: 4px; }
+    </style>
     <script>
         // API Helper Functions
         const API = {
@@ -732,6 +737,74 @@
             const date = new Date(isoString);
             return date.toLocaleString('id-ID');
         }
+
+        // Reusable client-side table sort (klik header + dropdown).
+        // Pakai data-sort-key di <th> dan data-sort="<value>" di <td> agar
+        // sort independen dari format tampilan (mis. "Rp 6.000" -> 6000).
+        const TableSort = {
+            init(tableId) {
+                const table = document.getElementById(tableId);
+                if (!table) return;
+                const headers = table.querySelectorAll('thead th[data-sort-key]');
+                headers.forEach((th, index) => {
+                    th.classList.add('sortable');
+                    if (!th.querySelector('.sort-indicator')) {
+                        const span = document.createElement('span');
+                        span.className = 'sort-indicator';
+                        th.appendChild(span);
+                    }
+                    th.addEventListener('click', () => {
+                        const current = table.dataset.sortDir === 'asc' &&
+                            table.dataset.sortCol === String(index);
+                        this.sort(tableId, index, current ? 'desc' : 'asc');
+                    });
+                });
+            },
+
+            _cellValue(row, index) {
+                const cell = row.children[index];
+                if (!cell) return '';
+                const raw = cell.dataset.sort !== undefined
+                    ? cell.dataset.sort : cell.textContent.trim();
+                const num = parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
+                return (raw !== '' && !isNaN(num) &&
+                    /^[\s\d.,\-Rp$€£g×x]*$/i.test(raw)) ? num : String(raw).toLowerCase();
+            },
+
+            sort(tableId, colIndex, dir) {
+                const table = document.getElementById(tableId);
+                if (!table) return;
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'))
+                    .filter(r => !r.hasAttribute('data-no-sort') &&
+                        r.querySelector('td[colspan]') === null);
+                if (!rows.length) return;
+                const factor = dir === 'asc' ? 1 : -1;
+                rows.sort((a, b) => {
+                    const va = this._cellValue(a, colIndex);
+                    const vb = this._cellValue(b, colIndex);
+                    if (va < vb) return -1 * factor;
+                    if (va > vb) return 1 * factor;
+                    return 0;
+                });
+                rows.forEach(r => tbody.appendChild(r));
+                table.dataset.sortCol = String(colIndex);
+                table.dataset.sortDir = dir;
+                table.querySelectorAll('thead th .sort-indicator')
+                    .forEach(s => { s.textContent = ''; });
+                const th = table.querySelectorAll('thead th')[colIndex];
+                const ind = th && th.querySelector('.sort-indicator');
+                if (ind) ind.textContent = dir === 'asc' ? ' ▲' : ' ▼';
+            },
+
+            // Re-apply current sort (dipakai setelah baris baru masuk via SSE).
+            reapply(tableId) {
+                const table = document.getElementById(tableId);
+                if (!table || table.dataset.sortCol === undefined) return;
+                this.sort(tableId, parseInt(table.dataset.sortCol, 10),
+                    table.dataset.sortDir || 'asc');
+            }
+        };
     </script>
     
     {% block extra_js %}{% endblock %}

@@ -191,29 +191,40 @@
 <div>
     <div class="carbon-flex carbon-flex--between carbon-mb-05">
         <h2 class="carbon-heading-03">Riwayat Terbaru</h2>
-        <a href="{{ url_for('main.history') }}" class="carbon-btn carbon-btn--ghost carbon-btn--sm">
-            Lihat Semua →
-        </a>
+        <div class="carbon-flex carbon-flex--gap">
+            <select id="dashSortBy" class="carbon-select" onchange="sortDashPackages()">
+                <option value="">Urutkan...</option>
+                <option value="1:desc">Waktu terbaru</option>
+                <option value="1:asc">Waktu terlama</option>
+                <option value="5:desc">Biaya tertinggi</option>
+                <option value="5:asc">Biaya terendah</option>
+                <option value="3:desc">Berat terberat</option>
+                <option value="3:asc">Berat teringan</option>
+            </select>
+            <a href="{{ url_for('main.history') }}" class="carbon-btn carbon-btn--ghost carbon-btn--sm">
+                Lihat Semua →
+            </a>
+        </div>
     </div>
     
-    <table class="carbon-table">
+    <table class="carbon-table" id="dashHistoryTable">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Waktu</th>
+                <th data-sort-key="id">ID</th>
+                <th data-sort-key="time">Waktu</th>
                 <th>Dimensi</th>
-                <th>Berat</th>
-                <th>Layanan</th>
-                <th>Biaya</th>
+                <th data-sort-key="weight">Berat</th>
+                <th data-sort-key="service">Layanan</th>
+                <th data-sort-key="price">Biaya</th>
             </tr>
         </thead>
         <tbody id="historyTable">
             {% for pkg in history|reverse %}
             <tr>
-                <td><code>#{{ pkg.id }}</code></td>
+                <td data-sort="{{ pkg.id }}"><code>#{{ pkg.id }}</code></td>
                 <td>{{ pkg.timestamp[:19] }}</td>
                 <td>{{ pkg.dimensions.panjang }}×{{ pkg.dimensions.lebar }}×{{ pkg.dimensions.tinggi }} cm</td>
-                <td>{{ pkg.weight.chargeable }}g</td>
+                <td data-sort="{{ pkg.weight.chargeable }}">{{ pkg.weight.chargeable }}g</td>
                 <td>
                     <span class="carbon-tag 
                         {% if pkg.service_type == 'REGULER' %}carbon-tag--blue
@@ -539,10 +550,10 @@
         // Add new row at top
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td><code>#${String(pkg.id).padStart(5, '0')}</code></td>
+            <td data-sort="${pkg.id}"><code>#${String(pkg.id).padStart(5, '0')}</code></td>
             <td>${pkg.timestamp.slice(0, 19)}</td>
             <td>${pkg.dimensions.panjang}×${pkg.dimensions.lebar}×${pkg.dimensions.tinggi} cm</td>
-            <td>${pkg.weight.chargeable}g</td>
+            <td data-sort="${pkg.weight.chargeable}">${pkg.weight.chargeable}g</td>
             <td><span class="carbon-tag ${tagClass}">${pkg.service_type}</span></td>
             <td>${formatCurrency(pkg.price)}</td>
         `;
@@ -553,6 +564,9 @@
         while (table.children.length > 10) {
             table.removeChild(table.lastChild);
         }
+
+        // Re-apply sort aktif supaya baris baru dari SSE tetap urut.
+        TableSort.reapply('dashHistoryTable');
     }
     
     // ========================================================================
@@ -667,10 +681,18 @@
         }, 5000);
     }
     
+    function sortDashPackages() {
+        const val = document.getElementById('dashSortBy').value;
+        if (!val) return;
+        const [col, dir] = val.split(':');
+        TableSort.sort('dashHistoryTable', parseInt(col, 10), dir);
+    }
+
     // Initialize real-time updates on page load
     document.addEventListener('DOMContentLoaded', () => {
         refreshHwStatus();
         setupRealTimeUpdates();
+        TableSort.init('dashHistoryTable');
     });
     
     // Cleanup on page unload

@@ -18,6 +18,15 @@
             <option value="EXPRESS">EXPRESS</option>
             <option value="KARGO">KARGO</option>
         </select>
+        <select id="sortBy" class="carbon-select" onchange="sortPackages()">
+            <option value="">Urutkan...</option>
+            <option value="1:desc">Waktu terbaru</option>
+            <option value="1:asc">Waktu terlama</option>
+            <option value="7:desc">Biaya tertinggi</option>
+            <option value="7:asc">Biaya terendah</option>
+            <option value="5:desc">Chargeable terberat</option>
+            <option value="5:asc">Chargeable teringan</option>
+        </select>
         <a id="exportCsvBtn" href="/history/export.csv"
            class="carbon-btn carbon-btn--tertiary carbon-btn--sm">
             Export CSV
@@ -59,26 +68,26 @@
     <table class="carbon-table" id="historyTable">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Waktu</th>
+                <th data-sort-key="id">ID</th>
+                <th data-sort-key="time">Waktu</th>
                 <th>Dimensi (P×L×T)</th>
-                <th>Berat Aktual</th>
-                <th>Berat Volumetrik</th>
-                <th>Chargeable</th>
-                <th>Layanan</th>
-                <th>Biaya</th>
+                <th data-sort-key="actual">Berat Aktual</th>
+                <th data-sort-key="volume">Berat Volumetrik</th>
+                <th data-sort-key="chargeable">Chargeable</th>
+                <th data-sort-key="service">Layanan</th>
+                <th data-sort-key="price">Biaya</th>
                 <th>Resi</th>
             </tr>
         </thead>
         <tbody>
             {% for pkg in packages|reverse %}
             <tr data-type="{{ pkg.service_type }}">
-                <td><code>#{{ pkg.id }}</code></td>
+                <td data-sort="{{ pkg.id }}"><code>#{{ pkg.id }}</code></td>
                 <td>{{ pkg.timestamp[:19] }}</td>
                 <td>{{ pkg.dimensions.panjang }} × {{ pkg.dimensions.lebar }} × {{ pkg.dimensions.tinggi }} cm</td>
-                <td>{{ pkg.weight.aktual }} g</td>
-                <td>{{ pkg.weight.volumetrik }} g</td>
-                <td><strong>{{ pkg.weight.chargeable }} g</strong></td>
+                <td data-sort="{{ pkg.weight.aktual }}">{{ pkg.weight.aktual }} g</td>
+                <td data-sort="{{ pkg.weight.volumetrik }}">{{ pkg.weight.volumetrik }} g</td>
+                <td data-sort="{{ pkg.weight.chargeable }}"><strong>{{ pkg.weight.chargeable }} g</strong></td>
                 <td>
                     <span class="carbon-tag 
                         {% if pkg.service_type == 'REGULER' %}carbon-tag--blue
@@ -87,7 +96,7 @@
                         {{ pkg.service_type }}
                     </span>
                 </td>
-                <td>Rp {{ "{:,}".format(pkg.price) }}</td>
+                <td data-sort="{{ pkg.price }}">Rp {{ "{:,}".format(pkg.price) }}</td>
                 <td><a href="/receipt/{{ pkg.id }}" target="_blank" title="Cetak Resi">Cetak</a>
                     <a href="/receipt/{{ pkg.id }}.pdf" title="Download Resi PDF" style="margin-left:6px;">PDF</a>
                     {% if pkg.detection_image %}<a href="/api/evidence/{{ pkg.id }}" target="_blank" title="Lihat Bukti Paket" style="margin-left:6px;">Bukti</a>{% endif %}</td>
@@ -159,6 +168,15 @@
             }
         });
     }
+
+    function sortPackages() {
+        const val = document.getElementById('sortBy').value;
+        if (!val) return;
+        const [col, dir] = val.split(':');
+        TableSort.sort('historyTable', parseInt(col, 10), dir);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => TableSort.init('historyTable'));
     
     async function resetData() {
         if (!confirm('Apakah Anda yakin ingin menghapus semua data? Aksi ini tidak dapat dibatalkan.')) {

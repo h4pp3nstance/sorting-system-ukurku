@@ -238,27 +238,39 @@
 
 <!-- Semua Data Paket -->
 <div class="carbon-mt-07">
-    <h2 class="carbon-heading-03 carbon-mb-05">Semua Data Paket</h2>
-    <table class="carbon-table">
+    <div class="carbon-flex carbon-flex--between carbon-mb-05">
+        <h2 class="carbon-heading-03">Semua Data Paket</h2>
+        <select id="adminSortBy" class="carbon-select" onchange="sortAdminPackages()">
+            <option value="">Urutkan...</option>
+            <option value="1:desc">Waktu terbaru</option>
+            <option value="1:asc">Waktu terlama</option>
+            <option value="6:desc">Biaya tertinggi</option>
+            <option value="6:asc">Biaya terendah</option>
+            <option value="4:desc">Berat terberat</option>
+            <option value="4:asc">Berat teringan</option>
+            <option value="2:asc">Mitra (A-Z)</option>
+        </select>
+    </div>
+    <table class="carbon-table" id="adminPackagesTable">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Waktu</th>
-                <th>Mitra</th>
+                <th data-sort-key="id">ID</th>
+                <th data-sort-key="time">Waktu</th>
+                <th data-sort-key="mitra">Mitra</th>
                 <th>Dimensi</th>
-                <th>Berat</th>
-                <th>Layanan</th>
-                <th>Biaya</th>
+                <th data-sort-key="weight">Berat</th>
+                <th data-sort-key="service">Layanan</th>
+                <th data-sort-key="price">Biaya</th>
             </tr>
         </thead>
         <tbody>
             {% for pkg in all_packages %}
             <tr>
-                <td><code>#{{ pkg.id }}</code></td>
+                <td data-sort="{{ pkg.id }}"><code>#{{ pkg.id }}</code></td>
                 <td>{{ pkg.timestamp[:19] if pkg.timestamp else '-' }}</td>
                 <td>{{ pkg.mitra_name or pkg.mitra_id or '-' }}</td>
                 <td>{{ pkg.dimensions.panjang }}×{{ pkg.dimensions.lebar }}×{{ pkg.dimensions.tinggi }} cm</td>
-                <td>{{ pkg.weight.chargeable }}g</td>
+                <td data-sort="{{ pkg.weight.chargeable }}">{{ pkg.weight.chargeable }}g</td>
                 <td>
                     <span class="carbon-tag
                         {% if pkg.service_type == 'REGULER' %}carbon-tag--blue
@@ -267,7 +279,7 @@
                         {{ pkg.service_type }}
                     </span>
                 </td>
-                <td>Rp {{ "{:,}".format(pkg.price) }}</td>
+                <td data-sort="{{ pkg.price }}">Rp {{ "{:,}".format(pkg.price) }}</td>
             </tr>
             {% else %}
             <tr><td colspan="7" class="carbon-text-secondary">Belum ada data paket</td></tr>
@@ -291,5 +303,14 @@
         tile.style.display = 'block';
         tile.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+
+    function sortAdminPackages() {
+        const val = document.getElementById('adminSortBy').value;
+        if (!val) return;
+        const [col, dir] = val.split(':');
+        TableSort.sort('adminPackagesTable', parseInt(col, 10), dir);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => TableSort.init('adminPackagesTable'));
 </script>
 {% endblock %}
