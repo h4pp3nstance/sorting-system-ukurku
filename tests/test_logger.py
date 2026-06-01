@@ -227,42 +227,5 @@ class TestLogConfig:
         assert 3 <= LogConfig.BACKUP_COUNT <= 30
 
 
-class TestFirebaseSyncHandler:
-    """Test Firebase sync handler"""
-    
-    def test_handler_init(self):
-        """Test handler initialization"""
-        from core.logger import FirebaseSyncHandler
-        import logging
-        
-        handler = FirebaseSyncHandler(level=logging.ERROR)
-        
-        assert handler.level == logging.ERROR
-        assert handler.queue.maxsize == 1000
-    
-    def test_handler_queue_not_blocking(self):
-        """Test handler doesn't block when queue full"""
-        from core.logger import FirebaseSyncHandler
-        import logging
-        
-        handler = FirebaseSyncHandler(level=logging.ERROR)
-        
-        # Fill queue beyond capacity (should not raise)
-        for i in range(1100):
-            record = logging.LogRecord(
-                name='test',
-                level=logging.ERROR,
-                pathname='test.py',
-                lineno=1,
-                msg=f"Message {i}",
-                args=(),
-                exc_info=None
-            )
-            handler.emit(record)
-        
-        # Should not raise, just drop extra messages
-        assert handler.queue.qsize() <= 1000
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

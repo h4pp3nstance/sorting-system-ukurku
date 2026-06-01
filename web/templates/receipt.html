@@ -201,6 +201,48 @@
             </div>
             {% endif %}
 
+            {% if package.sender %}
+            <hr class="divider">
+            <div class="section-title">PENGIRIM</div>
+            <div class="row">
+                <span class="label">Nama</span>
+                <span class="value">{{ package.sender.nama }}</span>
+            </div>
+            {% if package.sender.telepon %}
+            <div class="row">
+                <span class="label">Telepon</span>
+                <span class="value">{{ package.sender.telepon }}</span>
+            </div>
+            {% endif %}
+            {% if package.sender.alamat %}
+            <div class="row">
+                <span class="label">Alamat</span>
+                <span class="value">{{ package.sender.alamat }}</span>
+            </div>
+            {% endif %}
+            {% endif %}
+
+            {% if package.recipient %}
+            <hr class="divider">
+            <div class="section-title">PENERIMA</div>
+            <div class="row">
+                <span class="label">Nama</span>
+                <span class="value">{{ package.recipient.nama }}</span>
+            </div>
+            {% if package.recipient.telepon %}
+            <div class="row">
+                <span class="label">Telepon</span>
+                <span class="value">{{ package.recipient.telepon }}</span>
+            </div>
+            {% endif %}
+            {% if package.recipient.alamat %}
+            <div class="row">
+                <span class="label">Alamat</span>
+                <span class="value">{{ package.recipient.alamat }}</span>
+            </div>
+            {% endif %}
+            {% endif %}
+
             <hr class="divider">
             <div class="section-title">DIMENSI</div>
             <div class="row">
@@ -259,6 +301,7 @@
             <button type="button" class="btn btn-primary" onclick="window.print()">
                 Cetak
             </button>
+            <a href="/receipt/{{ package.id }}.pdf" class="btn btn-secondary">Download PDF</a>
             <a href="/dashboard" class="btn btn-secondary">Kembali</a>
         </div>
     </div>

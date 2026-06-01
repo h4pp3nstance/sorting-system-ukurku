@@ -125,6 +125,21 @@ config/*credentials*.json
 **/firebase_credentials.json
 **/serviceAccountKey.json
 
+# Local user store (auto-seeded; contains password hashes)
+config/users.json
+
+# Runtime data (validations + notifications, regenerated)
+config/mpc_data.json
+config/app_settings.json
+
+# SQLite database (offline-first storage, regenerated)
+config/ukurku.db
+config/ukurku.db-wal
+config/ukurku.db-shm
+
+# Stray/local calibration artifact (not canonical; real calib lives in program-python)
+config/calibration_top.json
+
 # Output files
 output/labels/*.txt
 output/logs/*.log

@@ -1,16 +1,13 @@
 """
 Logging Module for Sorting System
-Hybrid logging with local files and Firebase sync
+Hybrid logging with local rotating files.
 """
 
-import os
 import sys
 import json
-import queue
 import logging
-import threading
 from datetime import datetime, timezone
-from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+from logging.handlers import RotatingFileHandler
 from typing import Dict, Any, Optional
 from pathlib import Path
 
@@ -91,80 +88,6 @@ class ColoredFormatter(logging.Formatter):
 
 
 # =============================================================================
-# Firebase Sync Handler
-# =============================================================================
-
-class FirebaseSyncHandler(logging.Handler):
-    """
-    Async handler that queues logs for Firebase sync
-    Only syncs ERROR and above by default
-    """
-    
-    def __init__(self, level=logging.ERROR):
-        super().__init__(level)
-        self.queue = queue.Queue(maxsize=1000)
-        self.sync_thread = None
-        self._running = False
-        self._firebase = None
-    
-    def emit(self, record):
-        """Queue log record for sync"""
-        try:
-            log_entry = {
-                'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
-                'level': record.levelname,
-                'category': record.name,
-                'message': record.getMessage(),
-                'module': record.module,
-                'function': record.funcName
-            }
-            
-            if hasattr(record, 'extra_data'):
-                log_entry['data'] = record.extra_data
-            
-            if record.exc_info:
-                log_entry['exception'] = self.format(record)
-            
-            self.queue.put_nowait(log_entry)
-        except queue.Full:
-            pass  # Drop if queue full
-    
-    def start_sync(self, firebase_handler):
-        """Start background sync thread"""
-        self._firebase = firebase_handler
-        self._running = True
-        self.sync_thread = threading.Thread(target=self._sync_worker, daemon=True)
-        self.sync_thread.start()
-    
-    def stop_sync(self):
-        """Stop background sync thread"""
-        self._running = False
-        if self.sync_thread:
-            self.sync_thread.join(timeout=5)
-    
-    def _sync_worker(self):
-        """Background worker that uploads logs to Firebase"""
-        while self._running:
-            try:
-                log_entry = self.queue.get(timeout=5)
-                self._upload_to_firebase(log_entry)
-            except queue.Empty:
-                continue
-            except Exception as e:
-                print(f"[Logger] Sync error: {e}")
-    
-    def _upload_to_firebase(self, log_entry):
-        """Upload single log entry to Firebase"""
-        if self._firebase and hasattr(self._firebase, '_initialized') and self._firebase._initialized:
-            try:
-                from firebase_admin import db
-                ref = db.reference('logs')
-                ref.push(log_entry)
-            except Exception as e:
-                print(f"[Logger] Firebase upload failed: {e}")
-
-
-# =============================================================================
 # Main Logger Class
 # =============================================================================
 
@@ -176,7 +99,6 @@ class SortingLogger:
     - Multiple log files (main, error, hardware)
     - Rotating file handlers
     - Console output with colors
-    - Firebase sync for errors
     - Structured logging with extra data
     
     Usage:
@@ -233,16 +155,12 @@ class SortingLogger:
             level=logging.DEBUG
         )
         
-        # Error logger (also syncs to Firebase)
+        # Error logger
         self.error_logger = self._create_logger(
             'error',
             LogConfig.LOG_DIR / 'error.log',
             level=logging.ERROR
         )
-        
-        # Firebase sync handler
-        self.firebase_handler = FirebaseSyncHandler(level=logging.ERROR)
-        self.error_logger.addHandler(self.firebase_handler)
         
         # Audit logger
         self.audit_logger = self._create_logger(
@@ -308,11 +226,11 @@ class SortingLogger:
         self._log(self.main_logger, logging.WARNING, message, data)
     
     def error(self, message: str, exception: Optional[Exception] = None, **data):
-        """Error logging - also syncs to Firebase"""
+        """Error logging"""
         self._log(self.error_logger, logging.ERROR, message, data, exception)
     
     def critical(self, message: str, exception: Optional[Exception] = None, **data):
-        """Critical logging - also syncs to Firebase"""
+        """Critical logging"""
         self._log(self.error_logger, logging.CRITICAL, message, data, exception)
     
     def operation(self, message: str, **data):
@@ -346,7 +264,6 @@ class SortingLogger:
         """Log hardware error"""
         message = f"{component} | {error}"
         self._log(self.hardware_logger, logging.ERROR, message, data, exception)
-        # Also log to error logger for Firebase sync
         self._log(self.error_logger, logging.ERROR, f"Hardware: {message}", data, exception)
     
     def audit(self, action: str, user: Optional[str] = None, **data):
@@ -394,21 +311,6 @@ class SortingLogger:
             logger.log(level, full_message, exc_info=exception)
         else:
             logger.handle(record)
-    
-    def start_firebase_sync(self, firebase_handler):
-        """
-        Start Firebase sync for error logs
-        
-        Args:
-            firebase_handler: Initialized FirebaseHandler instance
-        """
-        self.firebase_handler.start_sync(firebase_handler)
-        self.info("Firebase log sync started")
-    
-    def stop_firebase_sync(self):
-        """Stop Firebase sync"""
-        self.firebase_handler.stop_sync()
-        self.info("Firebase log sync stopped")
     
     def get_log_files(self) -> Dict[str, Path]:
         """Get paths to all log files"""
@@ -466,22 +368,14 @@ def get_logger() -> SortingLogger:
     return _logger_instance
 
 
-def setup_logging(firebase_handler=None):
+def setup_logging():
     """
     Initialize logging system
-    
-    Args:
-        firebase_handler: Optional FirebaseHandler for cloud sync
     
     Returns:
         SortingLogger: Configured logger instance
     """
-    logger = get_logger()
-    
-    if firebase_handler:
-        logger.start_firebase_sync(firebase_handler)
-    
-    return logger
+    return get_logger()
 
 
 # =============================================================================
@@ -504,5 +398,5 @@ if __name__ == "__main__":
     except Exception as e:
         log.error("Test error occurred", exception=e, context="unit_test")
     
-    print("\n✅ Logger test complete!")
+    print("\nLogger test complete!")
     print(f"Log files: {log.get_log_files()}")

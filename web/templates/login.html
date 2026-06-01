@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masuk {{ role_label }} - UkurKu</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --carbon-gray-10: #f4f4f4;
+            --carbon-gray-20: #e0e0e0;
+            --carbon-gray-30: #c6c6c6;
+            --carbon-gray-50: #8d8d8d;
+            --carbon-gray-70: #525252;
+            --carbon-gray-80: #393939;
+            --carbon-gray-90: #262626;
+            --carbon-gray-100: #161616;
+            --carbon-blue-60: #0f62fe;
+            --carbon-blue-70: #0043ce;
+            --carbon-purple-60: #8a3ffc;
+            --carbon-teal-50: #009d9a;
+            --carbon-green-50: #24a148;
+            --carbon-red-60: #da1e28;
+            --carbon-yellow-30: #f1c21b;
+            --space-02: 0.25rem;
+            --space-03: 0.5rem;
+            --space-05: 1rem;
+            --space-06: 1.5rem;
+            --space-07: 2rem;
+            --font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-family);
+            color: #161616;
+            background-color: var(--carbon-gray-100);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-05);
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: #fff;
+        }
+
+        .login-accent { height: 6px; background-color: var(--carbon-blue-60); }
+        .login-accent--mitra { background-color: var(--carbon-blue-60); }
+        .login-accent--mpc { background-color: var(--carbon-purple-60); }
+        .login-accent--admin { background-color: var(--carbon-teal-50); }
+
+        .login-body { padding: var(--space-07); }
+
+        .login-eyebrow {
+            font-size: 0.75rem;
+            letter-spacing: 0.32px;
+            text-transform: uppercase;
+            color: var(--carbon-gray-70);
+        }
+
+        .login-title {
+            font-size: 1.75rem;
+            font-weight: 400;
+            margin-top: var(--space-02);
+            margin-bottom: var(--space-06);
+        }
+        .login-title strong { font-weight: 600; }
+
+        .form-group { margin-bottom: var(--space-05); }
+
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--carbon-gray-70);
+            margin-bottom: var(--space-03);
+        }
+
+        .form-input {
+            width: 100%;
+            height: 40px;
+            padding: 0 var(--space-05);
+            font-family: var(--font-family);
+            font-size: 0.875rem;
+            color: #161616;
+            background-color: var(--carbon-gray-10);
+            border: none;
+            border-bottom: 1px solid var(--carbon-gray-50);
+            outline: none;
+            transition: border-color 0.11s;
+        }
+        .form-input:focus { border-bottom: 2px solid var(--carbon-blue-60); }
+
+        .login-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            min-height: 48px;
+            padding: 0 var(--space-05);
+            font-family: var(--font-family);
+            font-size: 0.875rem;
+            color: #fff;
+            background-color: var(--carbon-blue-60);
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.11s;
+            margin-top: var(--space-06);
+        }
+        .login-btn:hover { background-color: var(--carbon-blue-70); }
+
+        .login-back {
+            display: inline-block;
+            margin-top: var(--space-06);
+            font-size: 0.875rem;
+            color: var(--carbon-blue-60);
+            text-decoration: none;
+        }
+        .login-back:hover { text-decoration: underline; }
+
+        .flash {
+            padding: var(--space-05);
+            margin-bottom: var(--space-06);
+            font-size: 0.875rem;
+        }
+        .flash--warning { background-color: #fff8e1; border-left: 3px solid var(--carbon-yellow-30); }
+        .flash--error { background-color: #fff1f1; border-left: 3px solid var(--carbon-red-60); }
+        .flash--info { background-color: #edf5ff; border-left: 3px solid var(--carbon-blue-60); }
+        .flash--success { background-color: #defbe6; border-left: 3px solid var(--carbon-green-50); }
+
+        .login-hint {
+            margin-top: var(--space-06);
+            padding-top: var(--space-05);
+            border-top: 1px solid var(--carbon-gray-20);
+            font-size: 0.75rem;
+            color: var(--carbon-gray-50);
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-accent login-accent--{{ role or 'mitra' }}"></div>
+        <div class="login-body">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash flash--{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="login-eyebrow">UkurKu &middot; Masuk</div>
+            <h1 class="login-title">Masuk sebagai <strong>{{ role_label }}</strong></h1>
+
+            <form method="POST" action="{{ url_for('auth.login') }}">
+                {% if role %}<input type="hidden" name="role" value="{{ role }}">{% endif %}
+
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input class="form-input" type="text" id="username" name="username"
+                           value="{{ username or '' }}" autocomplete="username"
+                           autofocus required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input class="form-input" type="password" id="password" name="password"
+                           autocomplete="current-password" required>
+                </div>
+
+                <button type="submit" class="login-btn">
+                    <span>Masuk</span>
+                    <span aria-hidden="true">&rarr;</span>
+                </button>
+            </form>
+
+            <a href="{{ url_for('main.landing') }}" class="login-back">&larr; Kembali ke halaman awal</a>
+
+            <div class="login-hint">
+                Akun demo: <strong>mitra / mitra123</strong>, <strong>mpc / mpc123</strong>,
+                <strong>admin / admin123</strong>.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

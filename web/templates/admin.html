@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Admin - UkurKu{% endblock %}
+
+{% block content %}
+<div class="carbon-flex carbon-flex--between" style="align-items: flex-end;">
+    <div>
+        <h1 class="carbon-heading-04">Dashboard Admin</h1>
+        <p class="carbon-text-secondary carbon-mt-05">
+            Pengelola sistem. Selamat datang, {{ user.name }}.
+        </p>
+    </div>
+    <span class="carbon-tag carbon-tag--teal carbon-tag--lg">Admin</span>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="carbon-notification carbon-notification--{{ category }} carbon-mt-06">
+            <div>{{ message }}</div>
+        </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<!-- Statistics Cards -->
+<div class="carbon-grid carbon-grid--cols-4 carbon-mt-06">
+    <div class="stat-card">
+        <div class="stat-card__value">{{ stats.total_packages if stats else 0 }}</div>
+        <div class="stat-card__label">Total Paket</div>
+    </div>
+    <div class="stat-card stat-card--kargo">
+        <div class="stat-card__value">{{ "Rp {:,.0f}".format(stats.total_revenue|default(0)).replace(",", ".") }}</div>
+        <div class="stat-card__label">Total Pendapatan</div>
+    </div>
+    <div class="stat-card stat-card--express">
+        <div class="stat-card__value">{{ user_count if user_count else 0 }}</div>
+        <div class="stat-card__label">Total User</div>
+    </div>
+    <div class="stat-card stat-card--reguler">
+        <div class="stat-card__value">{{ users|selectattr('role','equalto','mitra')|list|length }}</div>
+        <div class="stat-card__label">Mitra Aktif</div>
+    </div>
+</div>
+
+<!-- Manajemen User -->
+<div class="carbon-mt-07">
+    <h2 class="carbon-heading-03 carbon-mb-05">Manajemen User</h2>
+
+    <table class="carbon-table carbon-mb-06">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Nama</th>
+                <th>Peran</th>
+                <th>ID Cabang</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td><code>{{ u.username }}</code></td>
+                <td>{{ u.name }}</td>
+                <td>
+                    <span class="carbon-tag
+                        {% if u.role == 'mitra' %}carbon-tag--blue
+                        {% elif u.role == 'mpc' %}carbon-tag--purple
+                        {% else %}carbon-tag--teal{% endif %}">
+                        {{ u.role|upper }}
+                    </span>
+                </td>
+                <td>{{ u.mitra_id or u.mpc_id or '-' }}</td>
+                <td>
+                    <button type="button" class="carbon-btn carbon-btn--tertiary carbon-btn--sm"
+                            onclick="fillEditUser(this)"
+                            data-username="{{ u.username }}"
+                            data-name="{{ u.name }}"
+                            data-role="{{ u.role }}"
+                            data-mitra="{{ u.mitra_id or '' }}"
+                            data-mpc="{{ u.mpc_id or '' }}">
+                        Edit
+                    </button>
+                    <form method="POST" action="{{ url_for('main.admin_user_delete') }}"
+                          style="display:inline;"
+                          onsubmit="return confirm('Hapus user {{ u.username }}?');">
+                        <input type="hidden" name="username" value="{{ u.username }}">
+                        <button type="submit" class="carbon-btn carbon-btn--danger carbon-btn--sm">
+                            Hapus
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="carbon-text-secondary">Belum ada user</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="carbon-tile">
+        <h3 class="carbon-heading-02 carbon-mb-05">Tambah User Baru</h3>
+        <form method="POST" action="{{ url_for('main.admin_user_create') }}">
+            <div class="carbon-grid carbon-grid--cols-3">
+                <div class="form-group">
+                    <label class="carbon-label-01" for="new_username">Username</label>
+                    <input class="carbon-input" type="text" id="new_username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="new_name">Nama</label>
+                    <input class="carbon-input" type="text" id="new_name" name="name">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="new_password">Password</label>
+                    <input class="carbon-input" type="password" id="new_password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="new_role">Peran</label>
+                    <select class="carbon-input" id="new_role" name="role">
+                        <option value="mitra">Mitra</option>
+                        <option value="mpc">MPC</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="new_mitra_id">ID Mitra (opsional)</label>
+                    <input class="carbon-input" type="text" id="new_mitra_id" name="mitra_id" placeholder="MITRA-002">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="new_mpc_id">ID MPC (opsional)</label>
+                    <input class="carbon-input" type="text" id="new_mpc_id" name="mpc_id" placeholder="MPC-002">
+                </div>
+            </div>
+            <button type="submit" class="carbon-btn carbon-btn--primary carbon-mt-05">
+                Tambah User
+            </button>
+        </form>
+    </div>
+
+    <div class="carbon-tile carbon-mt-06" id="editUserTile" style="display:none;">
+        <h3 class="carbon-heading-02 carbon-mb-05">Edit User: <span id="edit_title"></span></h3>
+        <form method="POST" action="{{ url_for('main.admin_user_update') }}">
+            <input type="hidden" id="edit_username" name="username">
+            <div class="carbon-grid carbon-grid--cols-3">
+                <div class="form-group">
+                    <label class="carbon-label-01" for="edit_name">Nama</label>
+                    <input class="carbon-input" type="text" id="edit_name" name="name">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="edit_password">Password Baru (opsional)</label>
+                    <input class="carbon-input" type="password" id="edit_password" name="password"
+                           placeholder="Kosongkan jika tidak diubah">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="edit_role">Peran</label>
+                    <select class="carbon-input" id="edit_role" name="role">
+                        <option value="mitra">Mitra</option>
+                        <option value="mpc">MPC</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="edit_mitra_id">ID Mitra</label>
+                    <input class="carbon-input" type="text" id="edit_mitra_id" name="mitra_id">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="edit_mpc_id">ID MPC</label>
+                    <input class="carbon-input" type="text" id="edit_mpc_id" name="mpc_id">
+                </div>
+            </div>
+            <button type="submit" class="carbon-btn carbon-btn--primary carbon-mt-05">
+                Simpan Perubahan
+            </button>
+            <button type="button" class="carbon-btn carbon-btn--ghost carbon-mt-05"
+                    onclick="document.getElementById('editUserTile').style.display='none';">
+                Batal
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Pengaturan Toleransi & Tarif -->
+<div class="carbon-mt-07">
+    <h2 class="carbon-heading-03 carbon-mb-05">Pengaturan Sistem</h2>
+    <div class="carbon-grid carbon-grid--cols-2">
+        <div class="carbon-tile">
+            <h3 class="carbon-heading-02 carbon-mb-05">Toleransi Validasi</h3>
+            <p class="carbon-helper-text carbon-mb-05">Batas selisih Mitra vs MPC yang masih dianggap sesuai.</p>
+            <form method="POST" action="{{ url_for('main.admin_settings_update') }}">
+                <input type="hidden" name="section" value="toleransi">
+                <div class="form-group">
+                    <label class="carbon-label-01" for="dimensi_cm">Toleransi Dimensi (cm)</label>
+                    <input class="carbon-input" type="number" step="0.1" id="dimensi_cm"
+                           name="dimensi_cm" value="{{ settings.toleransi.dimensi_cm }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="berat_aktual_g">Toleransi Berat Aktual (g)</label>
+                    <input class="carbon-input" type="number" step="1" id="berat_aktual_g"
+                           name="berat_aktual_g" value="{{ settings.toleransi.berat_aktual_g }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="berat_tagihan_g">Toleransi Berat Tagihan (g)</label>
+                    <input class="carbon-input" type="number" step="1" id="berat_tagihan_g"
+                           name="berat_tagihan_g" value="{{ settings.toleransi.berat_tagihan_g }}">
+                </div>
+                <button type="submit" class="carbon-btn carbon-btn--primary carbon-mt-05">
+                    Simpan Toleransi
+                </button>
+            </form>
+        </div>
+
+        <div class="carbon-tile">
+            <h3 class="carbon-heading-02 carbon-mb-05">Tarif Layanan</h3>
+            <p class="carbon-helper-text carbon-mb-05">Harga per jenis layanan (Rupiah).</p>
+            <form method="POST" action="{{ url_for('main.admin_settings_update') }}">
+                <input type="hidden" name="section" value="tarif">
+                <div class="form-group">
+                    <label class="carbon-label-01" for="reguler">REGULER</label>
+                    <input class="carbon-input" type="number" step="500" id="reguler"
+                           name="reguler" value="{{ settings.tarif.REGULER }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="express">EXPRESS</label>
+                    <input class="carbon-input" type="number" step="500" id="express"
+                           name="express" value="{{ settings.tarif.EXPRESS }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="kargo">KARGO</label>
+                    <input class="carbon-input" type="number" step="500" id="kargo"
+                           name="kargo" value="{{ settings.tarif.KARGO }}">
+                </div>
+                <button type="submit" class="carbon-btn carbon-btn--primary carbon-mt-05">
+                    Simpan Tarif
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Semua Data Paket -->
+<div class="carbon-mt-07">
+    <h2 class="carbon-heading-03 carbon-mb-05">Semua Data Paket</h2>
+    <table class="carbon-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Waktu</th>
+                <th>Mitra</th>
+                <th>Dimensi</th>
+                <th>Berat</th>
+                <th>Layanan</th>
+                <th>Biaya</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pkg in all_packages %}
+            <tr>
+                <td><code>#{{ pkg.id }}</code></td>
+                <td>{{ pkg.timestamp[:19] if pkg.timestamp else '-' }}</td>
+                <td>{{ pkg.mitra_name or pkg.mitra_id or '-' }}</td>
+                <td>{{ pkg.dimensions.panjang }}×{{ pkg.dimensions.lebar }}×{{ pkg.dimensions.tinggi }} cm</td>
+                <td>{{ pkg.weight.chargeable }}g</td>
+                <td>
+                    <span class="carbon-tag
+                        {% if pkg.service_type == 'REGULER' %}carbon-tag--blue
+                        {% elif pkg.service_type == 'EXPRESS' %}carbon-tag--purple
+                        {% else %}carbon-tag--teal{% endif %}">
+                        {{ pkg.service_type }}
+                    </span>
+                </td>
+                <td>Rp {{ "{:,}".format(pkg.price) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="carbon-text-secondary">Belum ada data paket</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function fillEditUser(btn) {
+        document.getElementById('edit_username').value = btn.dataset.username;
+        document.getElementById('edit_title').textContent = btn.dataset.username;
+        document.getElementById('edit_name').value = btn.dataset.name || '';
+        document.getElementById('edit_role').value = btn.dataset.role || 'mitra';
+        document.getElementById('edit_mitra_id').value = btn.dataset.mitra || '';
+        document.getElementById('edit_mpc_id').value = btn.dataset.mpc || '';
+        document.getElementById('edit_password').value = '';
+        const tile = document.getElementById('editUserTile');
+        tile.style.display = 'block';
+        tile.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+</script>
+{% endblock %}

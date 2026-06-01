@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Peringatan MPC - UkurKu{% endblock %}
+
+{% block content %}
+<div class="carbon-flex carbon-flex--between" style="align-items: flex-end;">
+    <div>
+        <h1 class="carbon-heading-04">Peringatan MPC</h1>
+        <p class="carbon-text-secondary carbon-mt-05">
+            Paket Anda yang dinyatakan perlu review atau tidak sesuai oleh MPC.
+        </p>
+    </div>
+</div>
+
+<div class="carbon-mt-06">
+    {% for n in notifications %}
+    <div class="carbon-notification
+        {% if n.status == 'tidak_sesuai' %}carbon-notification--error
+        {% elif n.status == 'perlu_review' %}carbon-notification--warning
+        {% else %}carbon-notification--info{% endif %}"
+        data-notif-id="{{ n.id }}"
+        style="justify-content: space-between; align-items: center;">
+        <div>
+            <div class="carbon-heading-01">
+                {{ n.title }}
+                {% if not n.is_read %}
+                <span class="carbon-tag carbon-tag--red" style="margin-left:8px;">Baru</span>
+                {% endif %}
+            </div>
+            <p class="carbon-body-01 carbon-mt-05">{{ n.message }}</p>
+            <p class="carbon-label-01 carbon-text-secondary carbon-mt-05">
+                Paket #{{ n.package_id }} &middot; {{ n.created_at[:19] }}
+            </p>
+        </div>
+        {% if not n.is_read %}
+        <button class="carbon-btn carbon-btn--tertiary carbon-btn--sm"
+                onclick="markRead({{ n.id }}, this)">
+            Tandai Dibaca
+        </button>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="carbon-tile carbon-text-center carbon-text-secondary"
+         style="padding: var(--space-07);">
+        Tidak ada peringatan. Semua paket Anda sesuai.
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function markRead(id, btn) {
+        try {
+            const res = await API.post('/notifications/read', { id: id });
+            if (res.success) {
+                const card = btn.closest('[data-notif-id]');
+                const badge = card.querySelector('.carbon-tag--red');
+                if (badge) badge.remove();
+                btn.remove();
+            }
+        } catch (e) {
+            console.error('Gagal menandai dibaca:', e);
+        }
+    }
+</script>
+{% endblock %}

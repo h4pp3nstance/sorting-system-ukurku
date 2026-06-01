@@ -12,7 +12,6 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import web.routes as routes
-routes._use_firebase = False
 routes._storage = None
 
 from web import create_app
@@ -24,7 +23,6 @@ class TestReceiptRoute:
     @pytest.fixture(autouse=True)
     def reset_storage(self):
         routes._storage = routes.InMemoryStorage()
-        routes._use_firebase = False
 
     @pytest.fixture
     def app(self):

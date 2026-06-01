@@ -41,8 +41,6 @@ from .settings import (
     WEB_HOST,
     WEB_PORT,
     WEB_DEBUG,
-    # Firebase
-    FIREBASE_ENABLED,
     # Paths
     BASE_DIR,
     ASSETS_DIR,

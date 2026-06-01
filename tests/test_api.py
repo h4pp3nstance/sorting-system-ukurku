@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Force routes to use MockStorage for testing
 import web.routes as routes
-routes._use_firebase = False
 routes._storage = None  # Will reinitialize with InMemory
 
 from web import create_app
@@ -27,7 +26,6 @@ class TestWebAPI:
     def reset_storage(self):
         """Reset storage before each test"""
         routes._storage = routes.InMemoryStorage()
-        routes._use_firebase = False
     
     @pytest.fixture
     def app(self):
@@ -419,7 +417,6 @@ class TestServerSentEvents:
     def reset_storage(self):
         """Reset storage before each test"""
         routes._storage = routes.InMemoryStorage()
-        routes._use_firebase = False
     
     @pytest.fixture
     def app(self):

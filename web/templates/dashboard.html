@@ -38,6 +38,46 @@
     </div>
 </div>
 
+<!-- Data Paket (Pengirim & Penerima) -->
+<div class="carbon-tile carbon-mb-06">
+    <h2 class="carbon-heading-03 carbon-mb-05">Data Paket</h2>
+    <p class="carbon-helper-text carbon-mb-06" style="margin-top: calc(-1 * var(--space-04));">
+        Lengkapi data pengirim dan penerima sebelum mengambil hasil pengukuran
+    </p>
+    <div class="carbon-grid carbon-grid--cols-2" style="gap: var(--space-07);">
+        <div>
+            <h3 class="carbon-heading-02 carbon-mb-05">Pengirim</h3>
+            <div class="form-group">
+                <label class="carbon-label-01" for="sender_nama">Nama</label>
+                <input type="text" id="sender_nama" class="carbon-input" placeholder="Nama pengirim">
+            </div>
+            <div class="form-group">
+                <label class="carbon-label-01" for="sender_telepon">Telepon</label>
+                <input type="text" id="sender_telepon" class="carbon-input" placeholder="08xxxxxxxxxx">
+            </div>
+            <div class="form-group">
+                <label class="carbon-label-01" for="sender_alamat">Alamat</label>
+                <input type="text" id="sender_alamat" class="carbon-input" placeholder="Alamat pengirim">
+            </div>
+        </div>
+        <div>
+            <h3 class="carbon-heading-02 carbon-mb-05">Penerima</h3>
+            <div class="form-group">
+                <label class="carbon-label-01" for="recipient_nama">Nama</label>
+                <input type="text" id="recipient_nama" class="carbon-input" placeholder="Nama penerima">
+            </div>
+            <div class="form-group">
+                <label class="carbon-label-01" for="recipient_telepon">Telepon</label>
+                <input type="text" id="recipient_telepon" class="carbon-input" placeholder="08xxxxxxxxxx">
+            </div>
+            <div class="form-group">
+                <label class="carbon-label-01" for="recipient_alamat">Alamat</label>
+                <input type="text" id="recipient_alamat" class="carbon-input" placeholder="Alamat penerima">
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Statistics Cards -->
 <div class="carbon-grid carbon-grid--cols-3 carbon-mb-06">
     <div class="stat-card stat-card--reguler">
@@ -113,7 +153,12 @@
            target="_blank"
            class="carbon-btn carbon-btn--secondary carbon-mt-05"
            style="width: 100%;">
-            🖨️ Cetak Resi
+            Cetak Resi
+        </a>
+        <a href="/receipt/{{ status.last_package.id }}.pdf"
+           class="carbon-btn carbon-btn--tertiary carbon-mt-05"
+           style="width: 100%;">
+            Download Resi PDF
         </a>
         {% else %}
         <div class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
@@ -182,7 +227,29 @@
     
     async function triggerMeasurement() {
         if (isRunning) return;
-        
+
+        const senderNama = document.getElementById('sender_nama').value.trim();
+        const recipientNama = document.getElementById('recipient_nama').value.trim();
+        if (!senderNama || !recipientNama) {
+            const statusBar = document.getElementById('statusBar');
+            statusBar.className = 'carbon-notification carbon-notification--error carbon-mb-06';
+            statusBar.innerHTML = '<div><span class="status-dot status-dot--error"></span><strong>Nama pengirim dan penerima wajib diisi.</strong></div>';
+            return;
+        }
+
+        const payload = {
+            sender: {
+                nama: senderNama,
+                telepon: document.getElementById('sender_telepon').value.trim(),
+                alamat: document.getElementById('sender_alamat').value.trim()
+            },
+            recipient: {
+                nama: recipientNama,
+                telepon: document.getElementById('recipient_telepon').value.trim(),
+                alamat: document.getElementById('recipient_alamat').value.trim()
+            }
+        };
+
         const btn = document.getElementById('measureBtn');
         const statusBar = document.getElementById('statusBar');
         
@@ -199,7 +266,7 @@
         statusBar.innerHTML = '<div><span class="status-dot status-dot--warning"></span><strong>Sedang mengambil hasil pengukuran...</strong></div>';
         
         try {
-            const result = await API.post('/measure');
+            const result = await API.post('/measure', payload);
             
             if (result.success) {
                 // Success
@@ -374,7 +441,7 @@
                     addToHistoryTable(data.data.package);
                 }
                 // Visual notification
-                showNotification('📦 Paket baru terukur: ' + data.data.package.service_type);
+                showNotification('Paket baru terukur: ' + data.data.package.service_type);
                 break;
                 
             case 'stats_updated':

@@ -51,7 +51,7 @@ class MockPrinter(IPrinter):
         
         # Print to console
         print("\n" + "=" * 50)
-        print("🖨️  PRINTING LABEL")
+        print("PRINTING LABEL")
         print("=" * 50)
         print(label)
         print("=" * 50 + "\n")

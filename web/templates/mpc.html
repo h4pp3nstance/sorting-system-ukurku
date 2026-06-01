@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard MPC - UkurKu{% endblock %}
+
+{% block content %}
+<div class="carbon-flex carbon-flex--between" style="align-items: flex-end;">
+    <div>
+        <h1 class="carbon-heading-04">Dashboard MPC</h1>
+        <p class="carbon-text-secondary carbon-mt-05">
+            Pusat validasi paket. Selamat datang, {{ user.name }}.
+        </p>
+    </div>
+    <span class="carbon-tag carbon-tag--purple carbon-tag--lg">MPC</span>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="carbon-notification carbon-notification--{{ category }} carbon-mt-06">
+            <div>{{ message }}</div>
+        </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<!-- Statistics Cards -->
+<div class="carbon-grid carbon-grid--cols-4 carbon-mt-06">
+    <div class="stat-card stat-card--express">
+        <div class="stat-card__value">{{ packages|length }}</div>
+        <div class="stat-card__label">Paket Masuk</div>
+    </div>
+    <div class="stat-card stat-card--kargo">
+        <div class="stat-card__value">{{ val_stats.valid }}</div>
+        <div class="stat-card__label">Valid</div>
+    </div>
+    <div class="stat-card" style="border-left-color: var(--carbon-yellow-30);">
+        <div class="stat-card__value">{{ val_stats.perlu_review }}</div>
+        <div class="stat-card__label">Perlu Review</div>
+    </div>
+    <div class="stat-card" style="border-left-color: var(--carbon-red-60);">
+        <div class="stat-card__value">{{ val_stats.tidak_sesuai }}</div>
+        <div class="stat-card__label">Tidak Sesuai</div>
+    </div>
+</div>
+
+<!-- Paket Masuk -->
+<div class="carbon-mt-07">
+    <h2 class="carbon-heading-03 carbon-mb-05">Paket Masuk</h2>
+    <table class="carbon-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Mitra</th>
+                <th>Dimensi (Mitra)</th>
+                <th>Tagihan (Mitra)</th>
+                <th>Status Validasi</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pkg in packages %}
+            <tr>
+                <td><code>#{{ pkg.id }}</code></td>
+                <td>{{ pkg.mitra_name or pkg.mitra_id or '-' }}</td>
+                <td>{{ pkg.dimensions.panjang }}×{{ pkg.dimensions.lebar }}×{{ pkg.dimensions.tinggi }} cm</td>
+                <td>{{ pkg.weight.chargeable }}g</td>
+                <td>
+                    {% set v = validations.get(pkg.id|string) %}
+                    {% if v %}
+                    <span class="carbon-tag
+                        {% if v.status == 'valid' %}carbon-tag--green
+                        {% elif v.status == 'perlu_review' %}carbon-tag--yellow
+                        {% else %}carbon-tag--red{% endif %}">
+                        {{ v.status_label }}
+                    </span>
+                    {% else %}
+                    <span class="carbon-tag carbon-tag--gray">Belum Divalidasi</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('main.mpc_validate_page', package_id=pkg.id) }}"
+                       class="carbon-btn carbon-btn--tertiary carbon-btn--sm">
+                        {% if validations.get(pkg.id|string) %}Lihat / Ulang{% else %}Validasi{% endif %}
+                    </a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="carbon-text-secondary">Belum ada paket masuk</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Riwayat Validasi & Peringatan Terkirim -->
+<div class="carbon-grid carbon-grid--cols-2 carbon-mt-07">
+    <div>
+        <h2 class="carbon-heading-03 carbon-mb-05">Riwayat Validasi</h2>
+        <table class="carbon-table">
+            <thead>
+                <tr><th>Paket</th><th>Status</th><th>Waktu</th></tr>
+            </thead>
+            <tbody>
+                {% for v in validations.values() %}
+                <tr>
+                    <td><code>#{{ v.package_id }}</code></td>
+                    <td>
+                        <span class="carbon-tag
+                            {% if v.status == 'valid' %}carbon-tag--green
+                            {% elif v.status == 'perlu_review' %}carbon-tag--yellow
+                            {% else %}carbon-tag--red{% endif %}">
+                            {{ v.status_label }}
+                        </span>
+                    </td>
+                    <td>{{ v.validated_at[:19] }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="carbon-text-secondary">Belum ada validasi</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div>
+        <h2 class="carbon-heading-03 carbon-mb-05">Peringatan Terkirim</h2>
+        <table class="carbon-table">
+            <thead>
+                <tr><th>Paket</th><th>Mitra</th><th>Judul</th></tr>
+            </thead>
+            <tbody>
+                {% for n in notifications %}
+                <tr>
+                    <td><code>#{{ n.package_id }}</code></td>
+                    <td>{{ n.to_mitra_id or '-' }}</td>
+                    <td>{{ n.title }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="carbon-text-secondary">Belum ada peringatan</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -137,10 +137,10 @@ if __name__ == "__main__":
     print("-" * 40)
     
     valid, msg = validate_dimensions(23, 23, 23)
-    print(f"23×23×23: {'✓ Valid' if valid else f'✗ {msg}'}")
+    print(f"23×23×23: {'Valid' if valid else f'Invalid - {msg}'}")
     
     valid, msg = validate_dimensions(25, 20, 15)
-    print(f"25×20×15: {'✓ Valid' if valid else f'✗ {msg}'}")
+    print(f"25×20×15: {'Valid' if valid else f'Invalid - {msg}'}")
     
     valid, msg = validate_dimensions(-5, 10, 10)
-    print(f"-5×10×10: {'✓ Valid' if valid else f'✗ {msg}'}")
+    print(f"-5×10×10: {'Valid' if valid else f'Invalid - {msg}'}")

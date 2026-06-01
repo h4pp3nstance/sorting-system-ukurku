@@ -52,6 +52,13 @@
                    placeholder="0.0" step="0.1" min="0" max="5000">
             <span class="carbon-helper-text">Maksimum: 2000 gram</span>
         </div>
+
+        <div class="form-group">
+            <label class="carbon-label-01" for="alasan">Alasan Input Manual</label>
+            <input type="text" id="alasan" class="carbon-input"
+                   placeholder="Mis. sensor error, paket terlalu besar">
+            <span class="carbon-helper-text">Wajib diisi untuk audit data manual</span>
+        </div>
         
         <div class="carbon-mt-07">
             <h4 class="carbon-heading-02 carbon-mb-05">Hasil Kalkulasi</h4>
@@ -140,38 +147,7 @@
 
 {% block extra_css %}
 <style>
-    .form-group {
-        margin-bottom: var(--space-05);
-    }
-    
-    .carbon-input {
-        display: block;
-        width: 100%;
-        padding: var(--space-04) var(--space-05);
-        font-family: var(--font-family);
-        font-size: 0.875rem;
-        background-color: #fff;
-        border: none;
-        border-bottom: 1px solid var(--carbon-gray-50);
-        margin-top: var(--space-02);
-        margin-bottom: var(--space-02);
-        transition: border-color 0.11s;
-    }
-    
-    .carbon-input:hover {
-        border-bottom-color: var(--carbon-gray-80);
-    }
-    
-    .carbon-input:focus {
-        outline: 2px solid var(--carbon-blue-60);
-        outline-offset: -2px;
-        border-bottom-color: var(--carbon-blue-60);
-    }
-    
-    .carbon-input::placeholder {
-        color: var(--carbon-gray-50);
-    }
-    
+    /* .form-group and .carbon-input are defined once in base.html */
     .calc-result {
         background-color: var(--carbon-gray-10);
         padding: var(--space-05);
@@ -280,20 +256,38 @@
     
     async function calculateAndSave() {
         const calc = calculateOnly();
-        
+        const alasan = document.getElementById('alasan').value.trim();
+
         // Validate
         if (calc.values.panjang <= 0 || calc.values.lebar <= 0 || 
             calc.values.tinggi <= 0 || calc.values.berat <= 0) {
             showNotification('error', 'Semua field harus diisi dengan nilai lebih dari 0');
             return;
         }
-        
-        // Save via API (we'll create a new endpoint for manual entry)
-        showNotification('success', 
-            `Paket berhasil dicatat! ${calc.result.type} - ${formatCurrency(calc.result.price)}`);
-        
-        // Clear form after save
-        setTimeout(() => clearForm(), 2000);
+        if (!alasan) {
+            showNotification('error', 'Alasan input manual wajib diisi');
+            return;
+        }
+
+        try {
+            const result = await API.post('/manual', {
+                panjang: calc.values.panjang,
+                lebar: calc.values.lebar,
+                tinggi: calc.values.tinggi,
+                berat_aktual: calc.values.berat,
+                alasan: alasan
+            });
+
+            if (result.success) {
+                showNotification('success',
+                    `Paket #${result.data.id} tersimpan! ${result.data.service_type} - ${formatCurrency(result.data.price)}`);
+                setTimeout(() => clearForm(), 2000);
+            } else {
+                showNotification('error', result.error || 'Gagal menyimpan paket');
+            }
+        } catch (e) {
+            showNotification('error', 'Terjadi kesalahan saat menyimpan paket');
+        }
     }
     
     function clearForm() {

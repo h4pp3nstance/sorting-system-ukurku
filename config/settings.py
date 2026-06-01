@@ -89,14 +89,6 @@ WEB_DEBUG = os.getenv("WEB_DEBUG", "true").lower() == "true"
 
 
 # ============================================================
-# FIREBASE (placeholder - akan diisi dengan credentials)
-# ============================================================
-FIREBASE_ENABLED = os.getenv("FIREBASE_ENABLED", "false").lower() == "true"
-FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS", "config/firebase_credentials.json")
-FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL", "")
-
-
-# ============================================================
 # MEASUREMENT SOURCE (File-based Integration Bridge)
 # ============================================================
 
@@ -177,7 +169,6 @@ def print_config():
     print("=" * 50)
     print(f"Hardware Mode: {HARDWARE_MODE}")
     print(f"Web Server: {WEB_HOST}:{WEB_PORT}")
-    print(f"Firebase Enabled: {FIREBASE_ENABLED}")
     print(f"Base Directory: {BASE_DIR}")
     print("=" * 50 + "\n")
 

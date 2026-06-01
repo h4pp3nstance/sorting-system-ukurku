@@ -1,6 +1,6 @@
 """
-Unit Tests for Firebase Storage Handler
-Tests untuk storage/firebase_handler.py
+Unit Tests for In-Memory Storage Handler
+Tests untuk storage/memory_handler.py
 """
 
 import pytest
@@ -11,24 +11,22 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from storage.firebase_handler import (
-    MockFirebaseHandler,
-    create_storage_handler,
-    IStorageHandler
-)
+from storage.memory_handler import MemoryStorageHandler
+from storage.factory import create_storage_handler
+from storage.base import IStorageHandler
 
 
 # =============================================================================
-# Mock Firebase Handler Tests
+# In-Memory Storage Handler Tests
 # =============================================================================
 
-class TestMockFirebaseHandler:
-    """Test suite for MockFirebaseHandler"""
+class TestMemoryStorageHandler:
+    """Test suite for MemoryStorageHandler"""
     
     @pytest.fixture
     def handler(self):
-        """Create MockFirebaseHandler instance"""
-        h = MockFirebaseHandler()
+        """Create MemoryStorageHandler instance"""
+        h = MemoryStorageHandler()
         h.connect()
         return h
     
@@ -164,7 +162,7 @@ class TestStorageFactory:
         handler = create_storage_handler("mock")
         
         assert handler is not None
-        assert isinstance(handler, MockFirebaseHandler)
+        assert isinstance(handler, MemoryStorageHandler)
     
     def test_mock_handler_interface(self):
         """Test mock handler implements interface"""
@@ -176,7 +174,6 @@ class TestStorageFactory:
         assert hasattr(handler, 'save_package')
         assert hasattr(handler, 'get_package')
         assert hasattr(handler, 'get_all_packages')
-        assert hasattr(handler, 'update_statistics')
         assert hasattr(handler, 'get_statistics')
     
     def test_invalid_mode_raises_error(self):

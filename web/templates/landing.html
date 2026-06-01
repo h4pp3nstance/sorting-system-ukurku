@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UkurKu - Sistem Pengukuran dan Validasi Paket</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --carbon-gray-10: #f4f4f4;
+            --carbon-gray-20: #e0e0e0;
+            --carbon-gray-30: #c6c6c6;
+            --carbon-gray-50: #8d8d8d;
+            --carbon-gray-70: #525252;
+            --carbon-gray-80: #393939;
+            --carbon-gray-90: #262626;
+            --carbon-gray-100: #161616;
+            --carbon-blue-60: #0f62fe;
+            --carbon-blue-70: #0043ce;
+            --carbon-purple-60: #8a3ffc;
+            --carbon-teal-50: #009d9a;
+            --carbon-green-50: #24a148;
+            --carbon-red-60: #da1e28;
+            --carbon-yellow-30: #f1c21b;
+            --space-03: 0.5rem;
+            --space-05: 1rem;
+            --space-06: 1.5rem;
+            --space-07: 2rem;
+            --space-09: 3rem;
+            --font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-family);
+            color: #161616;
+            background-color: var(--carbon-gray-100);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .landing-header {
+            height: 48px;
+            background-color: var(--carbon-gray-100);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 var(--space-05);
+            border-bottom: 1px solid var(--carbon-gray-80);
+        }
+
+        .landing-header__name { font-weight: 600; letter-spacing: 0.1px; }
+        .landing-header__name span:first-child { color: var(--carbon-gray-30); font-weight: 400; margin-right: var(--space-03); }
+
+        .landing-main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-07) var(--space-05);
+            background:
+                radial-gradient(circle at 20% 20%, rgba(15,98,254,0.18), transparent 45%),
+                radial-gradient(circle at 80% 60%, rgba(138,63,252,0.16), transparent 45%),
+                var(--carbon-gray-100);
+        }
+
+        .landing-card {
+            width: 100%;
+            max-width: 760px;
+            background: #fff;
+            padding: var(--space-09);
+        }
+
+        .landing-logo {
+            font-size: 2.5rem;
+            font-weight: 300;
+            line-height: 1.1;
+            color: var(--carbon-gray-100);
+        }
+        .landing-logo strong { font-weight: 600; color: var(--carbon-blue-60); }
+
+        .landing-subtitle {
+            font-size: 1rem;
+            color: var(--carbon-gray-70);
+            margin-top: var(--space-03);
+            max-width: 52ch;
+        }
+
+        .landing-section-label {
+            font-size: 0.75rem;
+            letter-spacing: 0.32px;
+            color: var(--carbon-gray-70);
+            text-transform: uppercase;
+            margin-top: var(--space-07);
+            margin-bottom: var(--space-05);
+        }
+
+        .role-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-05);
+        }
+
+        .role-btn {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-03);
+            padding: var(--space-06);
+            text-decoration: none;
+            color: #fff;
+            min-height: 132px;
+            transition: transform 0.11s, filter 0.11s;
+        }
+        .role-btn:hover { filter: brightness(1.08); transform: translateY(-2px); }
+
+        .role-btn--mitra { background-color: var(--carbon-blue-60); }
+        .role-btn--mpc { background-color: var(--carbon-purple-60); }
+        .role-btn--admin { background-color: var(--carbon-teal-50); }
+
+        .role-btn__label { font-size: 0.75rem; letter-spacing: 0.32px; opacity: 0.85; }
+        .role-btn__name { font-size: 1.5rem; font-weight: 600; }
+        .role-btn__desc { font-size: 0.8125rem; opacity: 0.9; margin-top: auto; }
+
+        .landing-status {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-06);
+            margin-top: var(--space-07);
+            padding-top: var(--space-05);
+            border-top: 1px solid var(--carbon-gray-20);
+            font-size: 0.8125rem;
+            color: var(--carbon-gray-70);
+        }
+        .landing-status__item { display: flex; align-items: center; gap: var(--space-03); }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+        }
+        .status-dot--active { background-color: var(--carbon-green-50); }
+        .status-dot--inactive { background-color: var(--carbon-gray-50); }
+        .status-dot--warning { background-color: var(--carbon-yellow-30); }
+
+        .flash {
+            padding: var(--space-05);
+            margin-bottom: var(--space-06);
+            font-size: 0.875rem;
+        }
+        .flash--warning { background-color: #fff8e1; border-left: 3px solid var(--carbon-yellow-30); }
+        .flash--error { background-color: #fff1f1; border-left: 3px solid var(--carbon-red-60); }
+        .flash--info { background-color: #edf5ff; border-left: 3px solid var(--carbon-blue-60); }
+        .flash--success { background-color: #defbe6; border-left: 3px solid var(--carbon-green-50); }
+
+        .landing-footer {
+            text-align: center;
+            color: var(--carbon-gray-50);
+            font-size: 0.75rem;
+            padding: var(--space-05);
+        }
+
+        @media (max-width: 640px) {
+            .role-grid { grid-template-columns: 1fr; }
+            .landing-card { padding: var(--space-06); }
+        }
+    </style>
+</head>
+<body>
+    <header class="landing-header">
+        <div class="landing-header__name">
+            <span>UkurKu</span>Logistics Measurement System
+        </div>
+    </header>
+
+    <main class="landing-main">
+        <div class="landing-card">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash flash--{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="landing-logo"><strong>UkurKu</strong> Dashboard</div>
+            <p class="landing-subtitle">
+                Sistem pengukuran dimensi, berat aktual, validasi paket, dan cetak resi.
+                Pilih peran Anda untuk masuk ke dashboard.
+            </p>
+
+            <div class="landing-section-label">Masuk Sebagai</div>
+            <div class="role-grid">
+                <a href="{{ url_for('auth.login', role='mitra') }}" class="role-btn role-btn--mitra">
+                    <span class="role-btn__label">PERAN</span>
+                    <span class="role-btn__name">Mitra</span>
+                    <span class="role-btn__desc">Buat data paket, ukur, dan cetak resi.</span>
+                </a>
+                <a href="{{ url_for('auth.login', role='mpc') }}" class="role-btn role-btn--mpc">
+                    <span class="role-btn__label">PERAN</span>
+                    <span class="role-btn__name">MPC</span>
+                    <span class="role-btn__desc">Validasi ulang data paket dari Mitra.</span>
+                </a>
+                <a href="{{ url_for('auth.login', role='admin') }}" class="role-btn role-btn--admin">
+                    <span class="role-btn__label">PERAN</span>
+                    <span class="role-btn__name">Admin</span>
+                    <span class="role-btn__desc">Kelola user, toleransi, dan laporan.</span>
+                </a>
+            </div>
+
+            <div class="landing-status">
+                <div class="landing-status__item">
+                    <span class="status-dot status-dot--active"></span>
+                    Server Lokal Aktif
+                </div>
+                <div class="landing-status__item">
+                    <span class="status-dot status-dot--active"></span>
+                    Penyimpanan Lokal (SQLite)
+                </div>
+                <div class="landing-status__item">
+                    <span class="status-dot {{ mode_info.dot_class if mode_info else 'status-dot--warning' }}"></span>
+                    {{ mode_info.label if mode_info else 'Mode Sistem' }}
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="landing-footer">
+        UkurKu &middot; Sistem Pengukuran dan Validasi Paket
+    </footer>
+</body>
+</html>

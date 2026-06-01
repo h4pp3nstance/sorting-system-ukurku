@@ -18,6 +18,10 @@
             <option value="EXPRESS">EXPRESS</option>
             <option value="KARGO">KARGO</option>
         </select>
+        <a id="exportCsvBtn" href="/history/export.csv"
+           class="carbon-btn carbon-btn--tertiary carbon-btn--sm">
+            Export CSV
+        </a>
         <button class="carbon-btn carbon-btn--danger carbon-btn--sm" onclick="resetData()">
             Reset Data
         </button>
@@ -84,7 +88,8 @@
                     </span>
                 </td>
                 <td>Rp {{ "{:,}".format(pkg.price) }}</td>
-                <td><a href="/receipt/{{ pkg.id }}" target="_blank" title="Cetak Resi">🖨️</a></td>
+                <td><a href="/receipt/{{ pkg.id }}" target="_blank" title="Cetak Resi">Cetak</a>
+                    <a href="/receipt/{{ pkg.id }}.pdf" title="Download Resi PDF" style="margin-left:6px;">PDF</a></td>
             </tr>
             {% else %}
             <tr id="noDataRow">

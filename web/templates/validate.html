@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Validasi Paket - UkurKu{% endblock %}
+
+{% block content %}
+<div class="carbon-flex carbon-flex--between" style="align-items: flex-end;">
+    <div>
+        <h1 class="carbon-heading-04">Validasi Paket #{{ package.id }}</h1>
+        <p class="carbon-text-secondary carbon-mt-05">
+            Bandingkan data Mitra dengan hasil ukur ulang MPC.
+        </p>
+    </div>
+    <a href="{{ url_for('main.mpc_dashboard') }}" class="carbon-btn carbon-btn--ghost carbon-btn--sm">
+        ← Kembali
+    </a>
+</div>
+
+<div id="resultBar"></div>
+
+<div class="carbon-grid carbon-grid--cols-2 carbon-mt-06">
+    <!-- Data Mitra -->
+    <div class="carbon-tile">
+        <h2 class="carbon-heading-03 carbon-mb-05">Data Mitra</h2>
+        <div class="package-card__details">
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Panjang</span>
+                <span class="package-card__detail-value">{{ mitra_measurement.panjang }} cm</span>
+            </div>
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Lebar</span>
+                <span class="package-card__detail-value">{{ mitra_measurement.lebar }} cm</span>
+            </div>
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Tinggi</span>
+                <span class="package-card__detail-value">{{ mitra_measurement.tinggi }} cm</span>
+            </div>
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Berat Aktual</span>
+                <span class="package-card__detail-value">{{ mitra_measurement.berat_aktual }} g</span>
+            </div>
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Berat Volumetrik</span>
+                <span class="package-card__detail-value">{{ mitra_measurement.berat_volumetrik }} g</span>
+            </div>
+            <div class="package-card__detail-item">
+                <span class="package-card__detail-label">Berat Tagihan</span>
+                <span class="package-card__detail-value">{{ mitra_measurement.chargeable_weight }} g</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ukur Ulang MPC -->
+    <div class="carbon-tile">
+        <h2 class="carbon-heading-03 carbon-mb-05">Ukur Ulang MPC</h2>
+        <div class="form-group">
+            <label class="carbon-label-01" for="m_panjang">Panjang (cm)</label>
+            <input class="carbon-input" type="number" step="0.1" id="m_panjang"
+                   value="{{ existing.mpc_measurement.panjang if existing else '' }}">
+        </div>
+        <div class="form-group">
+            <label class="carbon-label-01" for="m_lebar">Lebar (cm)</label>
+            <input class="carbon-input" type="number" step="0.1" id="m_lebar"
+                   value="{{ existing.mpc_measurement.lebar if existing else '' }}">
+        </div>
+        <div class="form-group">
+            <label class="carbon-label-01" for="m_tinggi">Tinggi (cm)</label>
+            <input class="carbon-input" type="number" step="0.1" id="m_tinggi"
+                   value="{{ existing.mpc_measurement.tinggi if existing else '' }}">
+        </div>
+        <div class="form-group">
+            <label class="carbon-label-01" for="m_berat">Berat Aktual (g)</label>
+            <input class="carbon-input" type="number" step="1" id="m_berat"
+                   value="{{ existing.mpc_measurement.berat_aktual if existing else '' }}">
+        </div>
+        <div class="form-group">
+            <label class="carbon-label-01" for="m_catatan">Catatan (opsional)</label>
+            <input class="carbon-input" type="text" id="m_catatan"
+                   value="{{ existing.catatan if existing else '' }}">
+        </div>
+        <button class="carbon-btn carbon-btn--primary carbon-mt-05" onclick="submitValidation()">
+            Bandingkan & Simpan
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const PACKAGE_ID = "{{ package.id }}";
+
+    function tagClass(status) {
+        if (status === 'valid') return 'carbon-tag--green';
+        if (status === 'perlu_review') return 'carbon-tag--yellow';
+        return 'carbon-tag--red';
+    }
+
+    function notifClass(status) {
+        if (status === 'valid') return 'carbon-notification--success';
+        if (status === 'perlu_review') return 'carbon-notification--warning';
+        return 'carbon-notification--error';
+    }
+
+    async function submitValidation() {
+        const payload = {
+            package_id: PACKAGE_ID,
+            panjang: parseFloat(document.getElementById('m_panjang').value) || 0,
+            lebar: parseFloat(document.getElementById('m_lebar').value) || 0,
+            tinggi: parseFloat(document.getElementById('m_tinggi').value) || 0,
+            berat_aktual: parseFloat(document.getElementById('m_berat').value) || 0,
+            catatan: document.getElementById('m_catatan').value
+        };
+
+        const bar = document.getElementById('resultBar');
+        try {
+            const res = await API.post('/mpc/validate', payload);
+            if (!res.success) {
+                bar.className = 'carbon-notification carbon-notification--error carbon-mt-06';
+                bar.innerHTML = '<div><strong>Error:</strong> ' + (res.error || 'Gagal') + '</div>';
+                return;
+            }
+            const d = res.data;
+            let rows = '';
+            for (const k in d.selisih) {
+                const breached = d.breaches.includes(k);
+                rows += '<tr><td>' + k + '</td><td>' + d.selisih[k] +
+                        '</td><td>' + (breached ? 'lewat toleransi' : 'ok') + '</td></tr>';
+            }
+            bar.className = 'carbon-notification ' + notifClass(d.status) + ' carbon-mt-06';
+            bar.innerHTML =
+                '<div style="width:100%;">' +
+                '<div class="carbon-heading-02">Hasil: <span class="carbon-tag ' +
+                tagClass(d.status) + '">' + d.status_label + '</span></div>' +
+                '<table class="carbon-table carbon-mt-05"><thead><tr><th>Field</th>' +
+                '<th>Selisih</th><th>Keterangan</th></tr></thead><tbody>' + rows +
+                '</tbody></table></div>';
+        } catch (e) {
+            bar.className = 'carbon-notification carbon-notification--error carbon-mt-06';
+            bar.innerHTML = '<div><strong>Error:</strong> ' + e.message + '</div>';
+        }
+    }
+</script>
+{% endblock %}

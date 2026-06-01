@@ -1,22 +1,16 @@
 """
 Storage Module
-Provides data persistence for the sorting system
+Provides data persistence for the sorting system (SQLite default).
 """
 
-from storage.firebase_handler import (
-    IStorageHandler,
-    FirebaseHandler,
-    MockFirebaseHandler,
-    create_storage_handler,
-    get_storage,
-    FIREBASE_AVAILABLE
-)
+from storage.base import IStorageHandler
+from storage.sqlite_handler import SQLiteHandler
+from storage.memory_handler import MemoryStorageHandler
+from storage.factory import create_storage_handler
 
 __all__ = [
     'IStorageHandler',
-    'FirebaseHandler',
-    'MockFirebaseHandler',
+    'SQLiteHandler',
+    'MemoryStorageHandler',
     'create_storage_handler',
-    'get_storage',
-    'FIREBASE_AVAILABLE'
 ]

@@ -1,16 +1,20 @@
-# 📊 Logging Architecture Plan
+# Logging Architecture Plan
 ## Sistem Pengukuran & Penyortiran Paket
+
+> **Catatan (Juni 2026):** Firebase telah dihapus dari sistem. Logging kini
+> **lokal sepenuhnya** (rotating files). Referensi "Firebase sync" di bawah
+> adalah rancangan historis dan tidak lagi berlaku.
 
 ---
 
 ## 1. Overview
 
 Arsitektur logging dirancang untuk:
-- ✅ Operasi offline (network down)
-- ✅ Remote access untuk troubleshooting
-- ✅ Minimal storage footprint
-- ✅ Performance-first design
-- ✅ Audit trail compliance
+- Operasi offline (network down)
+- Remote access untuk troubleshooting
+- Minimal storage footprint
+- Performance-first design
+- Audit trail compliance
 
 ---
 
@@ -18,11 +22,11 @@ Arsitektur logging dirancang untuk:
 
 | Category | Purpose | Priority | Storage |
 |----------|---------|----------|---------|
-| **OPERATION** | Package measurements, sorting | HIGH | Firebase + Local |
+| **OPERATION** | Package measurements, sorting | HIGH | Local |
 | **HARDWARE** | Sensor status, actuator actions | MEDIUM | Local only |
 | **SYSTEM** | App lifecycle, memory, CPU | LOW | Local only |
-| **ERROR** | Exceptions, failures | CRITICAL | Firebase + Local |
-| **AUDIT** | User actions, access logs | HIGH | Firebase |
+| **ERROR** | Exceptions, failures | CRITICAL | Local |
+| **AUDIT** | User actions, access logs | HIGH | Local |
 | **PERFORMANCE** | Timing, throughput | LOW | Local (rotating) |
 
 ---
@@ -30,11 +34,11 @@ Arsitektur logging dirancang untuk:
 ## 3. Log Levels
 
 ```python
-CRITICAL = 50  # System crash, data loss
-ERROR    = 40  # Failures requiring attention
-WARNING  = 30  # Recoverable issues
-INFO     = 20  # Normal operations
-DEBUG    = 10  # Detailed debugging
+CRITICAL = 50 # System crash, data loss
+ERROR = 40 # Failures requiring attention
+WARNING = 30 # Recoverable issues
+INFO = 20 # Normal operations
+DEBUG = 10 # Detailed debugging
 ```
 
 ### Level Usage:
@@ -53,31 +57,31 @@ DEBUG    = 10  # Detailed debugging
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         LOG FLOW                                    │
+│ LOG FLOW │
 └─────────────────────────────────────────────────────────────────────┘
 
   Application
       │
       ├──────────────────────────────────────────────────────┐
-      │                                                      │
-      ▼                                                      ▼
-┌─────────────────┐                              ┌─────────────────┐
-│   LOCAL LOGS    │                              │  FIREBASE LOGS  │
-│   (SD Card)     │                              │    (Cloud)      │
-├─────────────────┤                              ├─────────────────┤
-│ • All levels    │                              │ • ERROR+        │
-│ • Rotating      │                              │ • AUDIT only    │
-│ • 7 days max    │                              │ • 30 days max   │
-│ • Fast writes   │                              │ • Async upload  │
-└─────────────────┘                              └─────────────────┘
-        │                                                │
-        │         ┌─────────────────┐                   │
-        └────────►│  LOG SYNCER     │◄──────────────────┘
-                  │  (Background)   │
-                  │                 │
-                  │ Uploads local   │
+      │ │
+      ▼ ▼
+┌─────────────────┐ ┌─────────────────┐
+│ LOCAL LOGS │ │ FIREBASE LOGS │
+│ (SD Card) │ │ (Cloud) │
+├─────────────────┤ ├─────────────────┤
+│ • All levels │ │ • ERROR+ │
+│ • Rotating │ │ • AUDIT only │
+│ • 7 days max │ │ • 30 days max │
+│ • Fast writes │ │ • Async upload │
+└─────────────────┘ └─────────────────┘
+        │ │
+        │ ┌─────────────────┐ │
+        └────────►│ LOG SYNCER │◄──────────────────┘
+                  │ (Background) │
+                  │ │
+                  │ Uploads local │
                   │ logs to Firebase│
-                  │ when online     │
+                  │ when online │
                   └─────────────────┘
 ```
 
@@ -87,7 +91,7 @@ DEBUG    = 10  # Detailed debugging
 |----------|------|------|
 | **Local Only** | Fast, works offline | No remote access |
 | **Cloud Only** | Remote access | Fails when offline |
-| **Hybrid** ✅ | Best of both | More complex |
+| **Hybrid** | Best of both | More complex |
 
 ---
 
@@ -118,9 +122,9 @@ LOCAL_LOG_LIMITS = {
 
 ### Local Logs (Text):
 ```
-2026-01-15 23:26:32.123 | INFO     | measurement | Package measured | id=PKG_001 type=EXPRESS weight=850g
-2026-01-15 23:26:33.456 | ERROR    | firebase    | Sync failed      | error=timeout retry=3
-2026-01-15 23:26:34.789 | WARNING  | hardware    | Sensor drift     | sensor=HX711 drift=2.5%
+2026-01-15 23:26:32.123 | INFO | measurement | Package measured | id=PKG_001 type=EXPRESS weight=850g
+2026-01-15 23:26:33.456 | ERROR | firebase | Sync failed | error=timeout retry=3
+2026-01-15 23:26:34.789 | WARNING | hardware | Sensor drift | sensor=HX711 drift=2.5%
 ```
 
 ### Firebase Logs (JSON):
@@ -147,18 +151,18 @@ LOCAL_LOG_LIMITS = {
 ### File Structure:
 ```
 sorting_system/
-├── logs/                           # Log output directory
-│   ├── main.log                    # Current main log
-│   ├── main.log.1                  # Rotated (yesterday)
-│   ├── error.log                   # Error-only log
-│   ├── hardware.log                # Hardware events
-│   └── .sync_status                # Firebase sync tracking
+├── logs/ # Log output directory
+│ ├── main.log # Current main log
+│ ├── main.log.1 # Rotated (yesterday)
+│ ├── error.log # Error-only log
+│ ├── hardware.log # Hardware events
+│ └── .sync_status # Firebase sync tracking
 │
 ├── core/
-│   └── logger.py                   # Main logging module
+│ └── logger.py # Main logging module
 │
 └── config/
-    └── logging_config.py           # Logging configuration
+    └── logging_config.py # Logging configuration
 ```
 
 ### Module Design:
@@ -195,7 +199,7 @@ class SortingLogger:
 
 ## 8. Best Practices for IoT/Embedded
 
-### ✅ DO:
+### DO:
 
 1. **Use async logging** - Don't block main thread
 2. **Buffer writes** - Reduce SD card wear
@@ -204,7 +208,7 @@ class SortingLogger:
 5. **Timestamp in ISO format** - Easy parsing
 6. **Log at boundaries** - Entry/exit of operations
 
-### ❌ DON'T:
+### DON'T:
 
 1. **Log sensitive data** - No passwords, tokens
 2. **Log in tight loops** - Performance killer
@@ -212,7 +216,7 @@ class SortingLogger:
 4. **Ignore log levels** - Not everything is ERROR
 5. **Skip rotation** - SD card will fill up
 
-### 🔄 SYNC Strategy:
+### SYNC Strategy:
 
 ```python
 # Offline-first approach
@@ -231,9 +235,9 @@ class SortingLogger:
 
 | Approach | Performance | Debugging Power |
 |----------|-------------|-----------------|
-| Minimal logging | ⚡ Fast | ❌ Hard to debug |
-| Full logging | 🐌 Slow | ✅ Easy debug |
-| **Smart logging** ✅ | ⚡ Fast | ✅ Good enough |
+| Minimal logging | Fast | Hard to debug |
+| Full logging | Slow | Easy debug |
+| **Smart logging** | Fast | Good enough |
 
 **Recommendation:** Log operations at INFO, hardware at DEBUG (disable in production), errors always.
 
@@ -278,13 +282,13 @@ from core.logger import get_logger
 log = get_logger()
 
 # Normal operation
-log.operation("Package measured", 
+log.operation("Package measured",
     package_id="PKG_001",
     service_type="EXPRESS",
     weight=850)
 
 # Hardware event
-log.hardware("HX711", "reading", 
+log.hardware("HX711", "reading",
     raw_value=12345,
     calibrated=850.5)
 
@@ -314,14 +318,14 @@ Firebase Functions (optional)
          │
          ▼
 ┌─────────────────┐
-│  Error Counter  │
-│  per 5 minutes  │
+│ Error Counter │
+│ per 5 minutes │
 └────────┬────────┘
          │
          ▼ If > threshold
 ┌─────────────────┐
-│  Send Alert     │
-│  (Email/Slack)  │
+│ Send Alert │
+│ (Email/Slack) │
 └─────────────────┘
 ```
 

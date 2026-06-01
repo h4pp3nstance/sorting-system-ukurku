@@ -1,10 +1,10 @@
 """
 Flask Routes
 Main pages and API endpoints for Sorting System
-With Firebase Integration, Real-time Updates, and Logging
+With SQLite storage, real-time updates (SSE), and logging
 """
 
-from flask import Blueprint, render_template, jsonify, request, Response
+from flask import Blueprint, render_template, jsonify, request, Response, redirect, url_for, flash
 from datetime import datetime
 import json
 import queue
@@ -15,6 +15,10 @@ from web.measurement_bridge import (
     classify_package, MeasurementBridgeError
 )
 from web.mode_helper import get_system_mode_info
+from web.auth import (
+    role_required, api_login_required, current_user,
+    ROLE_MITRA, ROLE_MPC, ROLE_ADMIN,
+)
 
 _MODE_INFO = get_system_mode_info()
 
@@ -37,38 +41,47 @@ main_bp = Blueprint('main', __name__)
 api_bp = Blueprint('api', __name__)
 
 # =============================================================================
-# Storage Backend (Firebase or In-Memory)
+# Storage Backend (SQLite default, in-memory fallback)
 # =============================================================================
 
 # Event queue for SSE (Server-Sent Events)
 _event_queues = []
 _event_lock = threading.Lock()
 
-# Try to use Firebase, fallback to in-memory
 _storage = None
-_use_firebase = False
+_storage_backend = "memory"
 
 def get_storage():
-    """Get or initialize storage backend"""
-    global _storage, _use_firebase
-    
+    """Get or initialize storage backend.
+
+    Default: SQLite (offline-first). Override via STORAGE_MODE env
+    (sqlite|memory). Falls back to in-memory on any init error.
+    """
+    global _storage, _storage_backend
+
     if _storage is None:
+        import os
+        mode = os.getenv("STORAGE_MODE", "sqlite").lower()
         try:
-            from storage.firebase_handler import create_storage_handler
-            _storage = create_storage_handler("auto")
+            from storage.factory import create_storage_handler
+            if mode == "sqlite":
+                db_path = os.getenv("DB_PATH") or None
+                _storage = create_storage_handler("sqlite", db_path=db_path)
+            else:
+                _storage = create_storage_handler(mode)
             _storage.connect()
-            _use_firebase = True
-            log.info("Firebase storage initialized", backend="firebase")
+            _storage_backend = mode
+            log.info("Storage initialized", backend=mode)
         except Exception as e:
-            log.warning("Firebase not available, using in-memory", error=str(e))
+            log.warning("Storage init failed, using in-memory", error=str(e))
             _storage = InMemoryStorage()
-            _use_firebase = False
-    
+            _storage_backend = "memory"
+
     return _storage
 
 
 class InMemoryStorage:
-    """Fallback in-memory storage if Firebase not available"""
+    """Fallback in-memory storage if SQLite not available"""
     
     def __init__(self):
         self.packages = []
@@ -141,33 +154,336 @@ system_status = {
 # Main Page Routes
 # =============================================================================
 
+def _scope_packages(packages):
+    """Filter packages to the current Mitra's own data.
+
+    Mitra users see only packages tagged with their mitra_id. Admin/MPC or
+    sessions without a mitra_id (e.g. tests) see everything unchanged.
+    """
+    user = current_user()
+    if not user or user.get('role') != ROLE_MITRA:
+        return packages
+    mitra_id = user.get('mitra_id')
+    if not mitra_id:
+        return packages
+    return [p for p in packages if p.get('mitra_id') == mitra_id]
+
+
+def _get_scoped_package(package_id):
+    """Fetch a package only if the current user is allowed to see it.
+
+    Mitra users can only access packages tagged with their own mitra_id.
+    Admin/MPC or sessions without a mitra_id get the package unchanged.
+    Returns None if not found OR not owned by the requesting Mitra (IDOR guard).
+    """
+    package = get_storage().get_package(package_id)
+    if not package:
+        return None
+    user = current_user()
+    if not user or user.get('role') != ROLE_MITRA:
+        return package
+    mitra_id = user.get('mitra_id')
+    if not mitra_id:
+        return package
+    if package.get('mitra_id') != mitra_id:
+        return None
+    return package
+
+
 @main_bp.route('/')
-def index():
-    """Redirect to dashboard"""
-    storage = get_storage()
-    packages = storage.get_all_packages(10)
-    
-    return render_template('dashboard.html', 
-                          status=system_status,
-                          history=packages)
+def landing():
+    """Public landing page with role selection."""
+    return render_template('landing.html',
+                          mode_info=_MODE_INFO)
 
 
 @main_bp.route('/dashboard')
+@role_required(ROLE_MITRA)
 def dashboard():
-    """Main monitoring dashboard"""
+    """Main monitoring dashboard (Mitra)"""
     storage = get_storage()
-    packages = storage.get_all_packages(10)
+    packages = _scope_packages(storage.get_all_packages(100))[:10]
     
     return render_template('dashboard.html',
                           status=system_status,
                           history=packages)
 
 
+@main_bp.route('/peringatan')
+@role_required(ROLE_MITRA)
+def mitra_notifications():
+    """Daftar peringatan dari MPC untuk Mitra ini."""
+    from web import mpc_store
+    user = current_user() or {}
+    mitra_id = user.get('mitra_id')
+    notifications = mpc_store.list_notifications(to_mitra_id=mitra_id)
+    return render_template('peringatan.html',
+                          status=system_status,
+                          notifications=notifications)
+
+
+@api_bp.route('/notifications/read', methods=['POST'])
+@api_login_required
+def api_notification_read():
+    """Tandai sebuah peringatan sudah dibaca."""
+    from web import mpc_store
+    payload = request.get_json(silent=True) or {}
+    try:
+        notif_id = int(payload.get('id'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'ID tidak valid.'}), 422
+    ok = mpc_store.mark_read(notif_id)
+    return jsonify({'success': ok})
+
+
+@main_bp.route('/mpc')
+@role_required(ROLE_MPC)
+def mpc_dashboard():
+    """MPC validation dashboard: paket masuk, statistik, peringatan."""
+    from web import mpc_store
+    storage = get_storage()
+    packages = storage.get_all_packages(100)
+    validations = {v['package_id']: v for v in mpc_store.list_validations()}
+    return render_template('mpc.html',
+                          status=system_status,
+                          packages=packages,
+                          validations=validations,
+                          val_stats=mpc_store.validation_stats(),
+                          notifications=mpc_store.list_notifications())
+
+
+@main_bp.route('/mpc/validate/<package_id>')
+@role_required(ROLE_MPC)
+def mpc_validate_page(package_id):
+    """Halaman validasi: tampilkan data Mitra + form ukur ulang MPC."""
+    from web import mpc_store
+    from web.validation_engine import extract_measurement
+    storage = get_storage()
+    package = storage.get_package(package_id)
+    if not package:
+        flash('Paket tidak ditemukan.', 'error')
+        return redirect(url_for('main.mpc_dashboard'))
+
+    return render_template('validate.html',
+                          status=system_status,
+                          package=package,
+                          mitra_measurement=extract_measurement(package),
+                          existing=mpc_store.get_validation(package_id))
+
+
+@api_bp.route('/mpc/validate', methods=['POST'])
+@api_login_required
+def api_mpc_validate():
+    """Proses input ukur ulang MPC -> bandingkan -> simpan + notifikasi."""
+    from web import mpc_store
+    from web.validation_engine import (
+        compare_measurements, extract_measurement,
+        STATUS_TIDAK_SESUAI, STATUS_PERLU_REVIEW,
+    )
+    from web.settings_store import get_tolerances
+
+    payload = request.get_json(silent=True) or {}
+    package_id = payload.get('package_id')
+
+    storage = get_storage()
+    package = storage.get_package(package_id) if package_id else None
+    if not package:
+        return jsonify({'success': False,
+                        'error': 'Paket tidak ditemukan.'}), 404
+
+    def _num(key):
+        try:
+            return float(payload.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    panjang = _num('panjang')
+    lebar = _num('lebar')
+    tinggi = _num('tinggi')
+    berat_aktual = _num('berat_aktual')
+    if panjang <= 0 or lebar <= 0 or tinggi <= 0 or berat_aktual <= 0:
+        return jsonify({'success': False,
+                        'error': 'Dimensi dan berat MPC harus lebih dari 0.'}), 422
+
+    berat_volumetrik = round((panjang * lebar * tinggi) / 6000 * 1000, 1)
+    chargeable = max(berat_aktual, berat_volumetrik)
+    mpc_measurement = {
+        'panjang': panjang, 'lebar': lebar, 'tinggi': tinggi,
+        'berat_aktual': berat_aktual, 'berat_volumetrik': berat_volumetrik,
+        'chargeable_weight': chargeable,
+    }
+
+    mitra_measurement = extract_measurement(package)
+    result = compare_measurements(mitra_measurement, mpc_measurement,
+                                  get_tolerances())
+
+    user = current_user() or {}
+    mpc_store.save_validation(
+        package_id, mpc_measurement, result,
+        mpc_username=user.get('username'),
+        catatan=payload.get('catatan'),
+    )
+
+    if result['status'] in (STATUS_TIDAK_SESUAI, STATUS_PERLU_REVIEW):
+        mpc_store.create_notification(
+            package_id=package_id,
+            to_mitra_id=package.get('mitra_id'),
+            title='Validasi: ' + result['status_label'],
+            message='Paket #{} dinyatakan {} oleh MPC.'.format(
+                package_id, result['status_label']),
+            status=result['status'],
+        )
+
+    return jsonify({'success': True, 'data': {
+        'status': result['status'],
+        'status_label': result['status_label'],
+        'selisih': result['selisih'],
+        'breaches': result['breaches'],
+        'mpc_measurement': mpc_measurement,
+    }})
+
+
+@main_bp.route('/history/export.csv')
+@role_required(ROLE_MITRA)
+def history_export_csv():
+    """Export riwayat paket (Mitra-scoped) sebagai file CSV."""
+    import csv
+    import io
+
+    storage = get_storage()
+    packages = _scope_packages(storage.get_all_packages(1000))
+
+    service_type = request.args.get('type')
+    if service_type:
+        packages = [p for p in packages
+                    if p.get('service_type') == service_type]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        'ID', 'Waktu', 'Panjang_cm', 'Lebar_cm', 'Tinggi_cm',
+        'Berat_Aktual_g', 'Berat_Volumetrik_g', 'Chargeable_g',
+        'Layanan', 'Biaya_Rp',
+    ])
+    for p in packages:
+        dims = p.get('dimensions', {}) or {}
+        weight = p.get('weight', {}) or {}
+        writer.writerow([
+            p.get('id', ''),
+            p.get('timestamp', ''),
+            dims.get('panjang', ''),
+            dims.get('lebar', ''),
+            dims.get('tinggi', ''),
+            weight.get('aktual', ''),
+            weight.get('volumetrik', ''),
+            weight.get('chargeable', ''),
+            p.get('service_type', ''),
+            p.get('price', ''),
+        ])
+
+    filename = 'riwayat-paket-' + datetime.now().strftime('%Y%m%d_%H%M%S') + '.csv'
+    return Response(
+        buf.getvalue(),
+        mimetype='text/csv',
+        headers={
+            'Content-Disposition': 'attachment; filename="' + filename + '"'
+        }
+    )
+
+
+@main_bp.route('/admin')
+@role_required(ROLE_ADMIN)
+def admin_dashboard():
+    """Admin management dashboard (placeholder, Phase 1)."""
+    storage = get_storage()
+    stats = storage.get_statistics()
+    from web.auth import list_users
+    from web.settings_store import load_settings
+    users = list_users()
+    return render_template('admin.html',
+                          status=system_status,
+                          stats=stats,
+                          users=users,
+                          user_count=len(users),
+                          settings=load_settings(),
+                          all_packages=storage.get_all_packages(100))
+
+
+@main_bp.route('/admin/users/create', methods=['POST'])
+@role_required(ROLE_ADMIN)
+def admin_user_create():
+    from web.auth import create_user
+    ok, err = create_user(
+        username=request.form.get('username'),
+        password=request.form.get('password'),
+        role=request.form.get('role'),
+        name=request.form.get('name'),
+        mitra_id=request.form.get('mitra_id'),
+        mpc_id=request.form.get('mpc_id'),
+    )
+    flash('User berhasil ditambahkan.' if ok else err,
+          'success' if ok else 'error')
+    return redirect(url_for('main.admin_dashboard'))
+
+
+@main_bp.route('/admin/users/update', methods=['POST'])
+@role_required(ROLE_ADMIN)
+def admin_user_update():
+    from web.auth import update_user
+    ok, err = update_user(
+        username=request.form.get('username'),
+        name=request.form.get('name'),
+        role=request.form.get('role'),
+        password=request.form.get('password') or None,
+        mitra_id=request.form.get('mitra_id'),
+        mpc_id=request.form.get('mpc_id'),
+    )
+    flash('User berhasil diperbarui.' if ok else err,
+          'success' if ok else 'error')
+    return redirect(url_for('main.admin_dashboard'))
+
+
+@main_bp.route('/admin/users/delete', methods=['POST'])
+@role_required(ROLE_ADMIN)
+def admin_user_delete():
+    from web.auth import delete_user, current_user
+    acting = (current_user() or {}).get('username')
+    ok, err = delete_user(request.form.get('username'), acting_username=acting)
+    flash('User berhasil dihapus.' if ok else err,
+          'success' if ok else 'error')
+    return redirect(url_for('main.admin_dashboard'))
+
+
+@main_bp.route('/admin/settings', methods=['POST'])
+@role_required(ROLE_ADMIN)
+def admin_settings_update():
+    from web.settings_store import update_tolerances, update_tariffs
+    section = request.form.get('section')
+    if section == 'toleransi':
+        update_tolerances(
+            dimensi_cm=request.form.get('dimensi_cm'),
+            berat_aktual_g=request.form.get('berat_aktual_g'),
+            berat_tagihan_g=request.form.get('berat_tagihan_g'),
+        )
+        flash('Toleransi validasi disimpan.', 'success')
+    elif section == 'tarif':
+        update_tariffs(
+            reguler=request.form.get('reguler'),
+            express=request.form.get('express'),
+            kargo=request.form.get('kargo'),
+        )
+        flash('Tarif layanan disimpan.', 'success')
+    else:
+        flash('Bagian pengaturan tidak dikenali.', 'error')
+    return redirect(url_for('main.admin_dashboard'))
+
+
 @main_bp.route('/history')
+@role_required(ROLE_MITRA)
 def history():
     """Package history page"""
     storage = get_storage()
-    packages = storage.get_all_packages(100)
+    packages = _scope_packages(storage.get_all_packages(200))[:100]
     
     return render_template('history.html',
                           packages=packages,
@@ -202,11 +518,48 @@ def _format_indonesian_price(price):
     return "Rp {:,.0f}".format(amount).replace(",", ".")
 
 
+def _extract_party(payload, key):
+    """Pull a {nama, telepon, alamat} block from request payload, sanitized."""
+    block = payload.get(key) or {}
+    if not isinstance(block, dict):
+        return {}
+    party = {}
+    for field in ('nama', 'telepon', 'alamat'):
+        value = block.get(field)
+        if value is not None:
+            party[field] = str(value).strip()
+    return party
+
+
+def _package_metadata_from_request():
+    """Build sender/recipient/service + mitra identity from request + session.
+
+    Returns a dict to merge into package_data. Empty/absent body yields only
+    the mitra identity (preserving legacy behavior for callers with no body).
+    """
+    payload = request.get_json(silent=True) or {}
+    meta = {}
+
+    sender = _extract_party(payload, 'sender')
+    recipient = _extract_party(payload, 'recipient')
+    if sender:
+        meta['sender'] = sender
+    if recipient:
+        meta['recipient'] = recipient
+
+    user = current_user()
+    if user:
+        meta['mitra_id'] = user.get('mitra_id')
+        meta['mitra_name'] = user.get('name')
+
+    return meta, payload
+
+
 @main_bp.route('/receipt/<package_id>')
+@role_required(ROLE_MITRA)
 def receipt(package_id):
     """Render printable receipt for a package."""
-    storage = get_storage()
-    package = storage.get_package(package_id)
+    package = _get_scoped_package(package_id)
 
     if not package:
         return render_template(
@@ -231,7 +584,33 @@ def receipt(package_id):
     )
 
 
+@main_bp.route('/receipt/<package_id>.pdf')
+@role_required(ROLE_MITRA)
+def receipt_pdf(package_id):
+    """Download receipt as a PDF file."""
+    package = _get_scoped_package(package_id)
+
+    if not package:
+        return jsonify({
+            'success': False,
+            'error': 'Paket tidak ditemukan'
+        }), 404
+
+    from web.pdf_receipt import build_receipt_pdf
+    pdf_bytes = build_receipt_pdf(package)
+
+    filename = "resi-PKT-" + str(package.get('id', '')).zfill(5) + ".pdf"
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={
+            'Content-Disposition': 'attachment; filename="' + filename + '"'
+        }
+    )
+
+
 @main_bp.route('/manual')
+@role_required(ROLE_MITRA)
 def manual():
     """Manual measurement page"""
     return render_template('manual.html',
@@ -245,6 +624,7 @@ def manual():
 # =============================================================================
 
 @api_bp.route('/status', methods=['GET'])
+@api_login_required
 def get_status():
     """Get current system status"""
     storage = get_storage()
@@ -258,13 +638,14 @@ def get_status():
             'is_running': system_status['is_running'],
             'last_package': system_status['last_package'],
             'statistics': stats.get('by_service_type', system_status['total_today']),
-            'storage_backend': 'firebase' if _use_firebase else 'memory',
+            'storage_backend': _storage_backend,
             'timestamp': datetime.now().isoformat()
         }
     })
 
 
 @api_bp.route('/measure', methods=['POST'])
+@api_login_required
 def trigger_measurement():
     """Trigger a measurement cycle"""
     global system_status
@@ -288,6 +669,102 @@ def trigger_measurement():
 
         storage = get_storage()
         use_file = should_use_file_bridge(HARDWARE_MODE, MEASUREMENT_MODE)
+        package_meta, _payload = _package_metadata_from_request()
+
+        if MEASUREMENT_MODE == 'in_process':
+            from web.measurement_engine import (
+                measure_real,
+                MeasurementUnavailableError,
+                NeedCalibrationError,
+                MeasurementTimeoutError,
+                MeasurementEngineError,
+            )
+
+            try:
+                mapped = measure_real()
+            except NeedCalibrationError as e:
+                log.warning("Measurement needs calibration", error=str(e))
+                return jsonify({
+                    'success': False,
+                    'error': 'Sistem belum dikalibrasi. ' + str(e),
+                    'error_type': 'need_calibration'
+                }), 422
+            except MeasurementTimeoutError as e:
+                log.warning("Measurement timeout", error=str(e))
+                return jsonify({
+                    'success': False,
+                    'error': 'Paket tidak terdeteksi. Pastikan paket berada '
+                             'di area ukur, lalu coba lagi.',
+                    'error_type': 'timeout'
+                }), 422
+            except MeasurementUnavailableError as e:
+                log.error("Measurement hardware unavailable", error=str(e))
+                return jsonify({
+                    'success': False,
+                    'error': 'Perangkat pengukuran tidak tersedia di sistem ini.',
+                    'error_type': 'unavailable'
+                }), 503
+            except MeasurementEngineError as e:
+                log.error("Measurement engine error", error=str(e))
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'error_type': 'measurement_engine'
+                }), 422
+
+            service_type, price = classify_package(mapped['chargeable_weight'])
+
+            package_data = {
+                'dimensions': {
+                    'panjang': mapped['panjang'],
+                    'lebar': mapped['lebar'],
+                    'tinggi': mapped['tinggi']
+                },
+                'weight': {
+                    'aktual': mapped['berat_aktual'],
+                    'volumetrik': mapped['berat_volumetrik'],
+                    'chargeable': mapped['chargeable_weight'],
+                    'source': mapped['chargeable_source']
+                },
+                'measurement_id': mapped['measurement_id'],
+                'service_type': service_type,
+                'price': price,
+                'detection_image': mapped['detection_image'],
+                'data_source': 'in_process',
+                **package_meta
+            }
+
+            package_id = storage.save_package(package_data)
+
+            log.operation("Package measured (in-process)",
+                package_id=package_id,
+                measurement_id=mapped['measurement_id'],
+                service_type=service_type,
+                weight=mapped['chargeable_weight'],
+                price=price,
+                backend=_storage_backend)
+
+            package = {
+                'id': package_id,
+                'timestamp': mapped['timestamp'],
+                **package_data
+            }
+
+            system_status['last_package'] = package
+            system_status['total_today'][service_type] += 1
+
+            broadcast_event('package_added', {
+                'package': package,
+                'statistics': {
+                    'total_today': sum(system_status['total_today'].values()),
+                    'by_type': dict(system_status['total_today'])
+                }
+            })
+
+            return jsonify({
+                'success': True,
+                'data': package
+            })
 
         if use_file:
             result = get_measurement_from_file(
@@ -314,8 +791,8 @@ def trigger_measurement():
                 'service_type': service_type,
                 'price': price,
                 'detection_image': result.detection_image,
-                'synced_to_firebase': _use_firebase,
-                'data_source': 'file_bridge'
+                'data_source': 'file_bridge',
+                **package_meta
             }
 
             package_id = storage.save_package(package_data)
@@ -326,7 +803,7 @@ def trigger_measurement():
                 service_type=service_type,
                 weight=result.chargeable_weight,
                 price=price,
-                synced=_use_firebase)
+                backend=_storage_backend)
 
             package = {
                 'id': package_id,
@@ -375,8 +852,8 @@ def trigger_measurement():
                 },
                 'service_type': service_type,
                 'price': price,
-                'synced_to_firebase': _use_firebase,
-                'data_source': 'mock'
+                'data_source': 'mock',
+                **package_meta
             }
 
             package_id = storage.save_package(package_data)
@@ -386,7 +863,7 @@ def trigger_measurement():
                 service_type=service_type,
                 weight=chargeable,
                 price=price,
-                synced=_use_firebase)
+                backend=_storage_backend)
 
             package = {
                 'id': package_id,
@@ -434,9 +911,98 @@ def trigger_measurement():
         system_status['is_running'] = False
 
 
+@api_bp.route('/manual', methods=['POST'])
+@api_login_required
+def manual_entry():
+    """Save a package from manual operator input (alat error / fallback)."""
+    payload = request.get_json(silent=True) or {}
+
+    try:
+        panjang = float(payload.get('panjang') or 0)
+        lebar = float(payload.get('lebar') or 0)
+        tinggi = float(payload.get('tinggi') or 0)
+        berat_aktual = float(payload.get('berat_aktual') or 0)
+    except (TypeError, ValueError):
+        return jsonify({
+            'success': False,
+            'error': 'Dimensi dan berat harus berupa angka.'
+        }), 422
+
+    if panjang <= 0 or lebar <= 0 or tinggi <= 0 or berat_aktual <= 0:
+        return jsonify({
+            'success': False,
+            'error': 'Dimensi dan berat harus lebih dari 0.'
+        }), 422
+
+    alasan = (payload.get('alasan') or '').strip()
+    if not alasan:
+        return jsonify({
+            'success': False,
+            'error': 'Alasan input manual wajib diisi untuk audit.'
+        }), 422
+
+    berat_volumetrik = round((panjang * lebar * tinggi) / 6000 * 1000, 1)
+    chargeable = max(berat_aktual, berat_volumetrik)
+    service_type, price = classify_package(chargeable)
+
+    package_meta, _payload = _package_metadata_from_request()
+
+    storage = get_storage()
+    package_data = {
+        'dimensions': {
+            'panjang': round(panjang, 2),
+            'lebar': round(lebar, 2),
+            'tinggi': round(tinggi, 2)
+        },
+        'weight': {
+            'aktual': round(berat_aktual, 1),
+            'volumetrik': berat_volumetrik,
+            'chargeable': chargeable
+        },
+        'service_type': service_type,
+        'price': price,
+        'alasan_manual': alasan,
+        'data_source': 'manual',
+        **package_meta
+    }
+
+    package_id = storage.save_package(package_data)
+
+    log.operation("Package measured (manual)",
+        package_id=package_id,
+        service_type=service_type,
+        weight=chargeable,
+        price=price,
+        reason=alasan,
+        backend=_storage_backend)
+
+    package = {
+        'id': package_id,
+        'timestamp': datetime.now().isoformat(),
+        **package_data
+    }
+
+    system_status['last_package'] = package
+    system_status['total_today'][service_type] += 1
+
+    broadcast_event('package_added', {
+        'package': package,
+        'statistics': {
+            'total_today': sum(system_status['total_today'].values()),
+            'by_type': dict(system_status['total_today'])
+        }
+    })
+
+    return jsonify({
+        'success': True,
+        'data': package
+    })
+
+
 @api_bp.route('/history', methods=['GET'])
+@api_login_required
 def get_history():
-    """Get package history from Firebase or memory"""
+    """Get package history from storage"""
     storage = get_storage()
     
     # Query parameters
@@ -445,7 +1011,7 @@ def get_history():
     service_type = request.args.get('type', None)
     
     # Get packages from storage
-    all_packages = storage.get_all_packages(limit + offset + 100)  # Get enough for filtering
+    all_packages = _scope_packages(storage.get_all_packages(limit + offset + 100))
     
     # Filter by type if specified
     if service_type:
@@ -463,16 +1029,16 @@ def get_history():
             'total': len(filtered),
             'limit': limit,
             'offset': offset,
-            'source': 'firebase' if _use_firebase else 'memory'
+            'source': _storage_backend
         }
     })
 
 
 @api_bp.route('/history/<package_id>', methods=['GET'])
+@api_login_required
 def get_package(package_id):
     """Get single package by ID"""
-    storage = get_storage()
-    package = storage.get_package(package_id)
+    package = _get_scoped_package(package_id)
     
     if package:
         return jsonify({
@@ -487,8 +1053,9 @@ def get_package(package_id):
 
 
 @api_bp.route('/statistics', methods=['GET'])
+@api_login_required
 def get_statistics():
-    """Get sorting statistics from Firebase or memory"""
+    """Get sorting statistics from storage"""
     storage = get_storage()
     stats = storage.get_statistics()
     
@@ -498,13 +1065,14 @@ def get_statistics():
             'total_packages': stats.get('total_packages', 0),
             'total_revenue': stats.get('total_revenue', 0),
             'by_service_type': stats.get('by_service_type', {}),
-            'source': 'firebase' if _use_firebase else 'memory',
+            'source': _storage_backend,
             'timestamp': datetime.now().isoformat()
         }
     })
 
 
 @api_bp.route('/reset', methods=['POST'])
+@api_login_required
 def reset_statistics():
     """Reset daily statistics (for testing)"""
     global system_status
@@ -526,25 +1094,17 @@ def reset_statistics():
     return jsonify({
         'success': True,
         'message': 'Statistics reset successfully',
-        'storage_reset': _use_firebase
+        'storage_reset': True
     })
 
 
 @api_bp.route('/sync', methods=['POST'])
+@api_login_required
 def force_sync():
-    """Force sync status with Firebase"""
-    storage = get_storage()
-    
-    if _use_firebase and hasattr(storage, 'update_system_status'):
-        storage.update_system_status('synced')
-        return jsonify({
-            'success': True,
-            'message': 'Synced with Firebase'
-        })
-    
+    """Sinkronisasi cloud tidak berlaku (penyimpanan lokal SQLite offline-first)."""
     return jsonify({
         'success': False,
-        'message': 'Firebase not connected'
+        'message': 'Penyimpanan lokal (SQLite). Sinkronisasi cloud tidak diperlukan.'
     }), 400
 
 # =============================================================================
@@ -577,6 +1137,7 @@ def broadcast_event(event_type: str, data: dict):
 
 
 @api_bp.route('/events', methods=['GET'])
+@api_login_required
 def stream_events():
     """
     SSE endpoint for real-time dashboard updates
@@ -628,6 +1189,7 @@ def stream_events():
 
 
 @api_bp.route('/events/test', methods=['POST'])
+@api_login_required
 def test_event():
     """Test SSE by broadcasting a test event"""
     broadcast_event('test', {

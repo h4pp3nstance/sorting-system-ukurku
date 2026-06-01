@@ -1,15 +1,15 @@
-# 📦 Sorting System - UkurKu
+# Sorting System - UkurKu
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/h4pp3nstance/sorting-system-ukurku)
-[![Python Tests](https://img.shields.io/badge/tests-211%20passed-brightgreen)](tests/)
+[![Python Tests](https://img.shields.io/badge/tests-367%20passed-brightgreen)](tests/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Smart IoT Package Sorting System with **Firebase Integration** - Raspberry Pi based weight and dimension measurement.
+Smart IoT Package Sorting System with **local SQLite storage (offline-first)** - Raspberry Pi based weight and dimension measurement.
 
-> 🎯 **Sistem pengukuran volume dan berat paket serta penyortiran otomatis** berbasis Raspberry Pi dengan dashboard real-time.
+> **Sistem pengukuran volume dan berat paket serta penyortiran otomatis** berbasis Raspberry Pi dengan dashboard real-time.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: GitHub Codespaces (Recommended for Demo)
 
@@ -58,49 +58,49 @@ python -m pytest tests/ -v
 python -m pytest tests/test_api.py -v
 ```
 
-## ✨ Features
+## Features
 
-- **📊 Real-time Dashboard** - Carbon Design System UI with live updates (SSE)
-- **⚖️ Weight Measurement** - HX711 load cell integration
-- **📐 Dimension Detection** - Camera-based volume calculation
-- **🔥 Firebase Sync** - Cloud database for history & analytics
-- **📝 Logging System** - Rotating file logs with Firebase sync
-- **🧪 Comprehensive Tests** - 211 unit & integration tests
+- ** Real-time Dashboard** - Carbon Design System UI with live updates (SSE)
+- ** Weight Measurement** - HX711 load cell integration
+- ** Dimension Detection** - Camera-based volume calculation
+- ** Local Storage** - SQLite database (offline-first, no cloud)
+- ** Logging System** - Rotating file logs
+- ** Comprehensive Tests** - unit & integration tests
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 sorting_system/
-├── .devcontainer/    # GitHub Codespaces configuration
-├── config/           # Configuration
-│   ├── settings.py   # App settings, GPIO pins, thresholds
-│   └── firebase_rules.json  # Firebase database rules
-├── core/             # Business logic
-│   ├── classification.py  # Service type classification
-│   ├── measurement.py     # Volumetric calculation
-│   └── logger.py          # Logging system
-├── hal/              # Hardware Abstraction Layer
-│   ├── interfaces.py # Abstract interfaces
-│   ├── mock/         # Mock implementations for testing
-│   │   ├── mock_hx711.py
-│   │   ├── mock_camera.py
-│   │   ├── mock_gpio.py
-│   │   └── mock_printer.py
-│   └── real/         # Real hardware implementations
-├── storage/          # Data persistence
-│   └── firebase_handler.py  # Firebase CRUD operations
-├── web/              # Flask web application
-│   ├── app.py        # Flask app factory
-│   ├── routes.py     # API endpoints
-│   └── templates/    # Jinja2 HTML templates
-├── tests/            # Unit & integration tests (211 tests)
-├── docs/             # Documentation
-├── main.py           # Application entry point
-├── run_web.py        # Web server runner
-└── requirements.txt  # Python dependencies
+├── .devcontainer/ # GitHub Codespaces configuration
+├── config/ # Configuration
+│ └── settings.py # App settings, GPIO pins, thresholds
+├── core/ # Business logic
+│ ├── classification.py # Service type classification
+│ ├── measurement.py # Volumetric calculation
+│ └── logger.py # Logging system
+├── hal/ # Hardware Abstraction Layer
+│ ├── interfaces.py # Abstract interfaces
+│ ├── mock/ # Mock implementations for testing
+│ │ ├── mock_hx711.py
+│ │ ├── mock_camera.py
+│ │ ├── mock_gpio.py
+│ │ └── mock_printer.py
+│ └── real/ # Real hardware implementations
+├── storage/ # Data persistence
+│ ├── sqlite_handler.py # SQLite storage (default)
+│ └── memory_handler.py # In-memory storage (test/fallback)
+├── web/ # Flask web application
+│ ├── app.py # Flask app factory
+│ ├── routes.py # API endpoints
+│ └── templates/ # Jinja2 HTML templates
+├── tests/ # Unit & integration tests (211 tests)
+├── docs/ # Documentation
+├── main.py # Application entry point
+├── run_web.py # Web server runner
+└── requirements.txt # Python dependencies
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 Edit `config/settings.py` or use environment variables:
 
@@ -109,9 +109,10 @@ Edit `config/settings.py` or use environment variables:
 | `HARDWARE_MODE` | `mock` | `mock` or `real` |
 | `WEB_HOST` | `0.0.0.0` | Web server host |
 | `WEB_PORT` | `5000` | Web server port |
-| `FIREBASE_ENABLED` | `false` | Enable Firebase |
+| `STORAGE_MODE` | `sqlite` | `sqlite` or `memory` |
+| `DB_PATH` | `config/ukurku.db` | SQLite database path |
 
-## 📦 Classification Rules
+## Classification Rules
 
 | Service | Weight Range | Price |
 |---------|--------------|-------|
@@ -119,7 +120,7 @@ Edit `config/settings.py` or use environment variables:
 | EXPRESS | 701-1300g | Rp 12.000 |
 | KARGO | 1301-2000g | Rp 5.000 |
 
-## 🔧 GPIO Mapping
+## GPIO Mapping
 
 | GPIO | Component |
 |------|-----------|
@@ -128,20 +129,19 @@ Edit `config/settings.py` or use environment variables:
 | 5, 6, 12, 13 | IR Sensors |
 | 23, 24 | HX711 |
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Backend**: Python 3.11+, Flask 3.0
 - **Frontend**: Carbon Design System (IBM)
-- **Database**: Firebase Realtime Database
+- **Database**: SQLite (local, offline-first)
 - **Hardware**: Raspberry Pi 4B, HX711, Servo, IR Sensors
 - **Testing**: pytest (211 tests)
 
-## 📖 Documentation
+## Documentation
 
 - [Progress Report](docs/PROGRESS_REPORT.md)
 - [Logging Architecture](docs/LOGGING_ARCHITECTURE.md)
-- [Firebase Optimization](docs/firebase_optimization.md)
 
-## 📜 License
+## License
 
 MIT License - See [LICENSE](LICENSE) for details.

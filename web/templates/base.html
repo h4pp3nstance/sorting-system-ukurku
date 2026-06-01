@@ -317,6 +317,59 @@
             cursor: not-allowed;
         }
         
+        /* Form / Text Input */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: var(--space-05);
+        }
+        
+        .form-group .carbon-label-01 {
+            display: block;
+            margin-bottom: var(--space-02);
+            color: var(--carbon-text-secondary);
+        }
+        
+        .carbon-input {
+            display: block;
+            width: 100%;
+            padding: var(--space-04) var(--space-05);
+            font-family: var(--font-family);
+            font-size: 0.875rem;
+            line-height: 1.43;
+            color: var(--carbon-text-primary);
+            background-color: var(--carbon-gray-10);
+            border: none;
+            border-bottom: 1px solid var(--carbon-gray-50);
+            transition: background-color 0.11s, border-color 0.11s, outline 0.11s;
+        }
+        
+        .carbon-input:hover {
+            border-bottom-color: var(--carbon-gray-80);
+        }
+        
+        .carbon-input:focus {
+            outline: 2px solid var(--carbon-blue-60);
+            outline-offset: -2px;
+            border-bottom-color: transparent;
+        }
+        
+        .carbon-input::placeholder {
+            color: var(--carbon-gray-50);
+        }
+        
+        .carbon-input:disabled {
+            color: var(--carbon-gray-50);
+            background-color: var(--carbon-gray-10);
+            border-bottom-color: var(--carbon-gray-30);
+            cursor: not-allowed;
+        }
+        
+        .carbon-input + .carbon-helper-text {
+            display: block;
+            margin-top: var(--space-02);
+        }
+        
         /* Tag */
         .carbon-tag {
             display: inline-flex;
@@ -548,7 +601,8 @@
                 <span>Dashboard Pengukuran Paket</span>
             </div>
             <nav class="carbon-header__nav">
-                <a href="{{ url_for('main.dashboard') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.dashboard' or request.endpoint == 'main.index' %}active{% endif %}">
+                {% if user and user.role == 'mitra' %}
+                <a href="{{ url_for('main.dashboard') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
                     Pengukuran
                 </a>
                 <a href="{{ url_for('main.history') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.history' %}active{% endif %}">
@@ -557,14 +611,24 @@
                 <a href="{{ url_for('main.manual') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.manual' %}active{% endif %}">
                     Input Manual
                 </a>
+                {% endif %}
+                {% if user %}
+                <span class="carbon-header__nav-link" style="color: var(--carbon-gray-30); cursor: default;">
+                    {{ user.name }} ({{ user.role|upper }})
+                </span>
+                <a href="{{ url_for('auth.logout') }}" class="carbon-header__nav-link">
+                    Logout
+                </a>
+                {% endif %}
             </nav>
         </header>
         
         <!-- Side Navigation -->
         <nav class="carbon-sidenav">
             <ul class="carbon-sidenav__items">
+                {% if user and user.role == 'mitra' %}
                 <li>
-                    <a href="{{ url_for('main.dashboard') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.dashboard' or request.endpoint == 'main.index' %}active{% endif %}">
+                    <a href="{{ url_for('main.dashboard') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
                         <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
                             <path d="M4 4h10v10H4zM18 4h10v10H18zM4 18h10v10H4zM18 18h10v10H18z"/>
                         </svg>
@@ -589,6 +653,36 @@
                         Input Manual
                     </a>
                 </li>
+                <li>
+                    <a href="{{ url_for('main.mitra_notifications') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.mitra_notifications' %}active{% endif %}">
+                        <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
+                            <path d="M28.18 19.1A2 2 0 0 1 28 16V13a12 12 0 0 0-9-11.6V1a3 3 0 0 0-6 0v.4A12 12 0 0 0 4 13v3a2 2 0 0 1-.18 3.1A2 2 0 0 0 4 23h7a5 5 0 0 0 10 0h7a2 2 0 0 0 1.18-3.9zM16 28a3 3 0 0 1-3-3h6a3 3 0 0 1-3 3z"/>
+                        </svg>
+                        Peringatan MPC
+                        {% if unread_notifications and unread_notifications > 0 %}
+                        <span class="carbon-tag carbon-tag--red" style="margin-left:auto;">{{ unread_notifications }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+                {% elif user and user.role == 'mpc' %}
+                <li>
+                    <a href="{{ url_for('main.mpc_dashboard') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.mpc_dashboard' %}active{% endif %}">
+                        <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
+                            <path d="M4 4h10v10H4zM18 4h10v10H18zM4 18h10v10H4zM18 18h10v10H18z"/>
+                        </svg>
+                        Dashboard MPC
+                    </a>
+                </li>
+                {% elif user and user.role == 'admin' %}
+                <li>
+                    <a href="{{ url_for('main.admin_dashboard') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.admin_dashboard' %}active{% endif %}">
+                        <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
+                            <path d="M4 4h10v10H4zM18 4h10v10H18zM4 18h10v10H4zM18 18h10v10H18z"/>
+                        </svg>
+                        Dashboard Admin
+                    </a>
+                </li>
+                {% endif %}
             </ul>
             
             <div style="padding: var(--space-05); margin-top: auto; border-top: 1px solid var(--carbon-gray-80);">
