@@ -14,6 +14,26 @@ hardware Raspberry Pi.
 import os
 import sys
 import threading
+from contextlib import contextmanager
+
+
+@contextmanager
+def _chdir_base():
+    """Jalankan blok dengan cwd = PROGRAM_PYTHON_BASE.
+
+    tahap14/tahap10 memakai path RELATIF ke cwd (hasil_tahap9/, hasil_tahap11/,
+    hasil_tahap14/archive/). Web service berjalan dari folder lain, jadi cwd
+    harus dialihkan sementara saat init sesi & pengukuran, lalu dikembalikan.
+    """
+    base = _resolve_program_python_base()
+    prev = os.getcwd()
+    if base and os.path.isdir(base):
+        os.chdir(base)
+    try:
+        yield
+    finally:
+        os.chdir(prev)
+
 
 
 class MeasurementEngineError(Exception):
@@ -74,7 +94,8 @@ def get_session():
     with _session_lock:
         if _session is None:
             session_cls = _load_session_class()
-            _session = session_cls(headless=True)
+            with _chdir_base():
+                _session = session_cls(headless=True)
         return _session
 
 
@@ -138,7 +159,8 @@ def measure_real(timeout_seconds: int = 30) -> dict:
 
     with _session_lock:
         try:
-            raw = session.measure_once(timeout=timeout_seconds)
+            with _chdir_base():
+                raw = session.measure_once(timeout=timeout_seconds)
         except MeasurementEngineError:
             raise
         except Exception as e:
