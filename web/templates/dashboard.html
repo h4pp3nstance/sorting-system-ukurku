@@ -631,19 +631,6 @@
         }
     }
     
-    function updateLastPackageCard(pkg) {
-        const card = document.getElementById('lastPackageCard');
-        if (!card) return;
-        
-        card.style.animation = 'none';
-        setTimeout(() => {
-            card.style.animation = 'fadeIn 0.3s ease';
-        }, 10);
-        
-        // Update card content (simplified - could be expanded)
-        console.log('Updating last package:', pkg);
-    }
-    
     function updateStatistics(stats) {
         if (stats.REGULER !== undefined) {
             document.getElementById('stat-reguler').textContent = stats.REGULER;
