@@ -111,6 +111,34 @@ def reset_session():
             _session = None
 
 
+def is_session_active():
+    """True jika sesi pengukuran sedang terbuka (kamera+GPIO dipegang)."""
+    return _session is not None
+
+
+def connect_session():
+    """Buka sesi (klaim kamera+GPIO). Idempotent.
+
+    Returns dict status. Membungkus error hardware jadi pesan ramah supaya
+    tombol Connect di web bisa menampilkannya.
+    """
+    if is_session_active():
+        return {"connected": True, "already": True}
+    get_session()
+    return {"connected": True, "already": False}
+
+
+def disconnect_session():
+    """Lepas sesi (bebaskan kamera+GPIO) supaya proses lain bisa pakai.
+
+    Aman dipanggil walau sesi belum terbuka.
+    """
+    was_active = is_session_active()
+    reset_session()
+    return {"connected": False, "was_active": was_active}
+
+
+
 def map_session_result(raw: dict) -> dict:
     """Map hasil MeasurementSession.measure_once() ke format package UI.
 

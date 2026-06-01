@@ -1107,6 +1107,61 @@ def force_sync():
         'message': 'Penyimpanan lokal (SQLite). Sinkronisasi cloud tidak diperlukan.'
     }), 400
 
+
+@api_bp.route('/hardware/status', methods=['GET'])
+@api_login_required
+def hardware_status():
+    """Status koneksi hardware (kamera+GPIO dipegang web atau tidak)."""
+    from config.settings import MEASUREMENT_MODE
+    try:
+        from web.measurement_engine import is_session_active
+        connected = is_session_active()
+    except Exception:
+        connected = False
+    return jsonify({
+        'success': True,
+        'data': {'connected': connected, 'mode': MEASUREMENT_MODE}
+    })
+
+
+@api_bp.route('/hardware/connect', methods=['POST'])
+@role_required(ROLE_MITRA)
+def hardware_connect():
+    """Klaim kamera+GPIO untuk web (sesi pengukuran in_process)."""
+    from web.measurement_engine import (
+        connect_session, MeasurementUnavailableError,
+        NeedCalibrationError, MeasurementEngineError,
+    )
+    try:
+        result = connect_session()
+    except NeedCalibrationError as e:
+        return jsonify({'success': False, 'error': 'Belum dikalibrasi. ' + str(e),
+                        'error_type': 'need_calibration'}), 422
+    except MeasurementUnavailableError as e:
+        return jsonify({'success': False, 'error': str(e),
+                        'error_type': 'unavailable'}), 503
+    except MeasurementEngineError as e:
+        return jsonify({'success': False, 'error': str(e)}), 422
+    except Exception as e:
+        return jsonify({'success': False,
+                        'error': 'Gagal connect hardware: ' + str(e)}), 500
+    return jsonify({'success': True, 'data': result,
+                    'message': 'Hardware terhubung. Kamera & sensor siap.'})
+
+
+@api_bp.route('/hardware/disconnect', methods=['POST'])
+@role_required(ROLE_MITRA)
+def hardware_disconnect():
+    """Lepas kamera+GPIO supaya program lain (tahap14 standalone) bisa pakai."""
+    from web.measurement_engine import disconnect_session
+    try:
+        result = disconnect_session()
+    except Exception as e:
+        return jsonify({'success': False,
+                        'error': 'Gagal disconnect: ' + str(e)}), 500
+    return jsonify({'success': True, 'data': result,
+                    'message': 'Hardware dilepas. Program lain boleh memakai kamera/sensor.'})
+
 # =============================================================================
 # Server-Sent Events (SSE) for Real-time Updates
 # =============================================================================

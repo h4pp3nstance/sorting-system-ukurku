@@ -20,6 +20,10 @@
         </p>
     </div>
     <div>
+        <span id="hwStatus" class="carbon-tag carbon-tag--gray" style="margin-right:8px;">Hardware: ?</span>
+        <button id="connectBtn" class="carbon-btn carbon-btn--tertiary" onclick="toggleHardware()">
+            Connect Hardware
+        </button>
         <button id="measureBtn" class="carbon-btn carbon-btn--primary" onclick="triggerMeasurement()">
             <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
                 <path d="M16 4L6 14l1.41 1.41L15 7.83V28h2V7.83l7.59 7.58L26 14 16 4z"/>
@@ -225,6 +229,53 @@
 <script>
     let isRunning = false;
     
+    let hwConnected = false;
+
+    function renderHwStatus(connected) {
+        hwConnected = connected;
+        const tag = document.getElementById('hwStatus');
+        const btn = document.getElementById('connectBtn');
+        if (connected) {
+            tag.className = 'carbon-tag carbon-tag--green';
+            tag.textContent = 'Hardware: Terhubung';
+            btn.textContent = 'Disconnect Hardware';
+        } else {
+            tag.className = 'carbon-tag carbon-tag--gray';
+            tag.textContent = 'Hardware: Terlepas';
+            btn.textContent = 'Connect Hardware';
+        }
+    }
+
+    async function refreshHwStatus() {
+        try {
+            const r = await API.get('/hardware/status');
+            if (r.success) renderHwStatus(r.data.connected);
+        } catch (e) { /* ignore */ }
+    }
+
+    async function toggleHardware() {
+        const btn = document.getElementById('connectBtn');
+        const statusBar = document.getElementById('statusBar');
+        btn.disabled = true;
+        const endpoint = hwConnected ? '/hardware/disconnect' : '/hardware/connect';
+        try {
+            const r = await API.post(endpoint);
+            if (r.success) {
+                renderHwStatus(r.data.connected);
+                statusBar.className = 'carbon-notification carbon-notification--success carbon-mb-06';
+                statusBar.innerHTML = '<div><span class="status-dot status-dot--active"></span><strong>' + r.message + '</strong></div>';
+            } else {
+                statusBar.className = 'carbon-notification carbon-notification--error carbon-mb-06';
+                statusBar.innerHTML = '<div><span class="status-dot status-dot--error"></span><strong>' + (r.error || 'Gagal') + '</strong></div>';
+            }
+        } catch (e) {
+            statusBar.className = 'carbon-notification carbon-notification--error carbon-mb-06';
+            statusBar.innerHTML = '<div><span class="status-dot status-dot--error"></span><strong>Error: ' + e.message + '</strong></div>';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
     async function triggerMeasurement() {
         if (isRunning) return;
 
@@ -536,6 +587,7 @@
     
     // Initialize real-time updates on page load
     document.addEventListener('DOMContentLoaded', () => {
+        refreshHwStatus();
         setupRealTimeUpdates();
     });
     
