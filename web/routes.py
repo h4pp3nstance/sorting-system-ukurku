@@ -609,6 +609,36 @@ def receipt_pdf(package_id):
     )
 
 
+@main_bp.route('/api/evidence/<package_id>')
+@role_required(ROLE_MITRA)
+def package_evidence(package_id):
+    """Serve the detection evidence image for a package (read-only).
+
+    Keyed by package_id (path comes from DB, never the client) + per-mitra
+    scope + path confined to PROGRAM_PYTHON_BASE -> path traversal not possible.
+    """
+    import os
+    from flask import send_file
+    from config.settings import PROGRAM_PYTHON_BASE
+
+    package = _get_scoped_package(package_id)
+    if not package:
+        return jsonify({'success': False, 'error': 'Paket tidak ditemukan'}), 404
+
+    rel = (package.get('detection_image') or '').strip()
+    if not rel or not PROGRAM_PYTHON_BASE:
+        return jsonify({'success': False,
+                        'error': 'Bukti gambar tidak tersedia untuk paket ini.'}), 404
+
+    base = os.path.realpath(PROGRAM_PYTHON_BASE)
+    target = os.path.realpath(os.path.join(base, rel))
+    if not (target == base or target.startswith(base + os.sep)) or not os.path.isfile(target):
+        return jsonify({'success': False,
+                        'error': 'Bukti gambar tidak ditemukan.'}), 404
+
+    return send_file(target, mimetype='image/jpeg')
+
+
 @main_bp.route('/manual')
 @role_required(ROLE_MITRA)
 def manual():

@@ -89,7 +89,8 @@
                 </td>
                 <td>Rp {{ "{:,}".format(pkg.price) }}</td>
                 <td><a href="/receipt/{{ pkg.id }}" target="_blank" title="Cetak Resi">Cetak</a>
-                    <a href="/receipt/{{ pkg.id }}.pdf" title="Download Resi PDF" style="margin-left:6px;">PDF</a></td>
+                    <a href="/receipt/{{ pkg.id }}.pdf" title="Download Resi PDF" style="margin-left:6px;">PDF</a>
+                    {% if pkg.detection_image %}<a href="/api/evidence/{{ pkg.id }}" target="_blank" title="Lihat Bukti Paket" style="margin-left:6px;">Bukti</a>{% endif %}</td>
             </tr>
             {% else %}
             <tr id="noDataRow">

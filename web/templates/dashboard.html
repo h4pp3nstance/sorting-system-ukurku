@@ -167,6 +167,14 @@
            style="width: 100%;">
             Download Resi PDF
         </a>
+        {% if status.last_package.detection_image %}
+        <a href="/api/evidence/{{ status.last_package.id }}"
+           target="_blank"
+           class="carbon-btn carbon-btn--ghost carbon-mt-05"
+           style="width: 100%;">
+            Lihat Bukti Paket
+        </a>
+        {% endif %}
         {% else %}
         <div class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
             <svg width="48" height="48" viewBox="0 0 32 32" fill="currentColor" style="opacity: 0.5;">
