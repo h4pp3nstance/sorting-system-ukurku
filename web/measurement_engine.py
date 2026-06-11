@@ -92,10 +92,12 @@ def _load_session_class():
 
 
 def get_camera_service():
-    """Singleton CameraService dengan opener = open_fixed_camera (di-inject).
+    """Singleton CameraService dengan opener auto-scan non-interaktif (di-inject).
 
     HAL tidak mengimpor program-python; opener disuntik dari sini supaya HAL
-    tetap import-able di laptop.
+    tetap import-able di laptop. Opener mencoba beberapa /dev/video* dan
+    memakai yang pertama berhasil (TANPA input()/blocking, beda dari
+    open_fixed_camera_auto bawaan yang menunggu ENTER).
     """
     global _camera_service
     if _camera_service is None:
@@ -106,8 +108,18 @@ def get_camera_service():
             if base and base not in sys.path:
                 sys.path.insert(0, base)
             import tahap14_integrated_chargeable as t14
+            candidates = [t14.FIXED_CAMERA_DEVICE, "/dev/video0",
+                          "/dev/video1", "/dev/video2"]
+            seen = set()
             with _chdir_base():
-                return t14.open_fixed_camera(t14.FIXED_CAMERA_DEVICE)
+                for device in candidates:
+                    if device in seen:
+                        continue
+                    seen.add(device)
+                    cap, dev, w, h = t14.open_fixed_camera(device)
+                    if cap is not None:
+                        return cap, dev, w, h
+            return None, t14.FIXED_CAMERA_DEVICE, None, None
 
         _camera_service = CameraService.get_instance(_opener)
     return _camera_service
