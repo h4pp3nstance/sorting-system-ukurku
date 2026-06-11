@@ -56,6 +56,9 @@ class MeasurementTimeoutError(MeasurementEngineError):
 _session = None
 _session_lock = threading.Lock()
 
+# Singleton CameraService (pemilik tunggal VideoCapture; dibagi preview + sesi)
+_camera_service = None
+
 
 def _resolve_program_python_base():
     """Cari folder program-python (sumber MeasurementSession)."""
@@ -88,14 +91,37 @@ def _load_session_class():
     return MeasurementSession
 
 
+def get_camera_service():
+    """Singleton CameraService dengan opener = open_fixed_camera (di-inject).
+
+    HAL tidak mengimpor program-python; opener disuntik dari sini supaya HAL
+    tetap import-able di laptop.
+    """
+    global _camera_service
+    if _camera_service is None:
+        from hal.camera_service import CameraService
+
+        def _opener():
+            base = _resolve_program_python_base()
+            if base and base not in sys.path:
+                sys.path.insert(0, base)
+            import tahap14_integrated_chargeable as t14
+            with _chdir_base():
+                return t14.open_fixed_camera(t14.FIXED_CAMERA_DEVICE)
+
+        _camera_service = CameraService.get_instance(_opener)
+    return _camera_service
+
+
 def get_session():
     """Ambil/inisialisasi singleton MeasurementSession (kamera hangat)."""
     global _session
     with _session_lock:
         if _session is None:
             session_cls = _load_session_class()
+            camera = get_camera_service()
             with _chdir_base():
-                _session = session_cls(headless=True)
+                _session = session_cls(headless=True, camera=camera)
         return _session
 
 
@@ -135,6 +161,14 @@ def disconnect_session():
     """
     was_active = is_session_active()
     reset_session()
+    cam = None
+    try:
+        from hal.camera_service import CameraService
+        cam = CameraService.peek_instance()
+    except Exception:
+        cam = None
+    if cam is not None:
+        cam.stop()
     return {"connected": False, "was_active": was_active}
 
 
