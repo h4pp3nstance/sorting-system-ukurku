@@ -27,5 +27,6 @@ if __name__ == '__main__':
     app.run(
         host=WEB_HOST,
         port=WEB_PORT,
-        debug=WEB_DEBUG
+        debug=WEB_DEBUG,
+        threaded=True
     )

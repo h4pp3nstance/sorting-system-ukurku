@@ -31,7 +31,7 @@ def main():
     print("=" * 60 + "\n")
     
     app = create_app()
-    app.run(host=WEB_HOST, port=WEB_PORT, debug=WEB_DEBUG)
+    app.run(host=WEB_HOST, port=WEB_PORT, debug=WEB_DEBUG, threaded=True)
 
 if __name__ == '__main__':
     main()
