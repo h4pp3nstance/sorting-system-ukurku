@@ -39,8 +39,13 @@ _RETARE_SAMPLES = 25
 class MeasurementSession:
     """Sesi pengukuran in-process dengan kamera tetap hangat."""
 
-    def __init__(self, headless=True):
+    def __init__(self, headless=True, camera=None):
         self.headless = headless
+        # camera=None -> sesi membuka & memiliki kameranya sendiri (perilaku lama);
+        # bila di-inject CameraService, sesi hanya membaca dan TIDAK me-release.
+        self._camera = camera
+        self._owns_camera = camera is None
+        self._last_frame_id = -1
         self.cap = None  # diset awal supaya close() aman bila init gagal sebelum kamera dibuka
 
         # Lazy import modul hardware/tahap14 (hanya tersedia di Pi)
@@ -64,11 +69,16 @@ class MeasurementSession:
             self.offset = self.offset_calibration
 
             # --- Kamera (dibuka SEKALI, tetap hangat) ---
-            cap, device, frame_w, frame_h = t14.open_fixed_camera(t14.FIXED_CAMERA_DEVICE)
-            if cap is None:
-                raise RuntimeError("Kamera gagal dibuka pada inisialisasi sesi.")
-            self.cap = cap
-            self.device = device
+            if self._camera is not None:
+                self._camera.start()
+                frame_w, frame_h = self._camera.frame_size()
+                self.device = t14.FIXED_CAMERA_DEVICE
+            else:
+                cap, device, frame_w, frame_h = t14.open_fixed_camera(t14.FIXED_CAMERA_DEVICE)
+                if cap is None:
+                    raise RuntimeError("Kamera gagal dibuka pada inisialisasi sesi.")
+                self.cap = cap
+                self.device = device
             self.frame_w = frame_w
             self.frame_h = frame_h
 
@@ -164,9 +174,18 @@ class MeasurementSession:
         t14 = self._t14
         cvsys = self._cvsys
 
-        ret, frame = self.cap.read()
-        if not ret or frame is None:
-            return None, "frame_read_failed", None
+        if self._camera is not None:
+            frame, frame_id = self._camera.read_with_id()
+            if frame is None:
+                return None, "frame_read_failed", None
+            # Tolak frame_id yang sama: cegah deteksi kestabilan menghitung satu frame dua kali.
+            if frame_id == self._last_frame_id:
+                return None, "frame_not_fresh", None
+            self._last_frame_id = frame_id
+        else:
+            ret, frame = self.cap.read()
+            if not ret or frame is None:
+                return None, "frame_read_failed", None
 
         undistorted = cvsys.undistort_frame(
             frame, self.camera_matrix, self.dist_coeffs, self.new_camera_matrix
@@ -323,7 +342,7 @@ class MeasurementSession:
     def close(self):
         """Lepas kamera + cleanup GPIO."""
         try:
-            if self.cap is not None:
+            if self._owns_camera and self.cap is not None:
                 self.cap.release()
         except Exception:
             pass
