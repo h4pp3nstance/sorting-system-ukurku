@@ -746,7 +746,8 @@
                 const table = document.getElementById(tableId);
                 if (!table) return;
                 const headers = table.querySelectorAll('thead th[data-sort-key]');
-                headers.forEach((th, index) => {
+                headers.forEach((th) => {
+                    const colIndex = th.cellIndex;
                     th.classList.add('sortable');
                     if (!th.querySelector('.sort-indicator')) {
                         const span = document.createElement('span');
@@ -755,8 +756,8 @@
                     }
                     th.addEventListener('click', () => {
                         const current = table.dataset.sortDir === 'asc' &&
-                            table.dataset.sortCol === String(index);
-                        this.sort(tableId, index, current ? 'desc' : 'asc');
+                            table.dataset.sortCol === String(colIndex);
+                        this.sort(tableId, colIndex, current ? 'desc' : 'asc');
                     });
                 });
             },
