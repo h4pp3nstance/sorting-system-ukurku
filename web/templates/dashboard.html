@@ -45,6 +45,23 @@
     </div>
 </div>
 
+<!-- Live Preview Kamera -->
+<div class="carbon-tile carbon-mb-06">
+    <div class="carbon-flex carbon-flex--between carbon-mb-05">
+        <h2 class="carbon-heading-03">Preview Kamera</h2>
+        <button id="previewBtn" class="carbon-btn carbon-btn--tertiary"
+                onclick="togglePreview()">Mulai Preview</button>
+    </div>
+    <div style="background:#161616;border-radius:4px;overflow:hidden;
+                display:flex;align-items:center;justify-content:center;
+                min-height:240px;">
+        <img id="cameraPreview" alt="Preview kamera"
+             style="max-width:100%;display:none;">
+        <span id="previewPlaceholder" class="carbon-text-secondary"
+              style="padding:var(--space-06);">Preview nonaktif</span>
+    </div>
+</div>
+
 <!-- Data Paket (Pengirim & Penerima) -->
 <div class="carbon-tile carbon-mb-06">
     <h2 class="carbon-heading-03 carbon-mb-05">Data Paket</h2>
@@ -252,6 +269,25 @@
     let isRunning = false;
     
     let hwConnected = false;
+
+    let previewOn = false;
+    function togglePreview() {
+        const img = document.getElementById('cameraPreview');
+        const ph = document.getElementById('previewPlaceholder');
+        const btn = document.getElementById('previewBtn');
+        previewOn = !previewOn;
+        if (previewOn) {
+            img.src = "{{ url_for('preview.video_feed') }}?t=" + Date.now();
+            img.style.display = 'block';
+            ph.style.display = 'none';
+            btn.textContent = 'Hentikan Preview';
+        } else {
+            img.src = "";
+            img.style.display = 'none';
+            ph.style.display = 'block';
+            btn.textContent = 'Mulai Preview';
+        }
+    }
 
     function renderHwStatus(connected) {
         hwConnected = connected;
