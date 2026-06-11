@@ -18,9 +18,11 @@ def create_app():
     # Register blueprints
     from .routes import main_bp, api_bp
     from .auth import auth_bp
+    from .preview import preview_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(auth_bp)
+    app.register_blueprint(preview_bp)
 
     from .auth import current_user
 
