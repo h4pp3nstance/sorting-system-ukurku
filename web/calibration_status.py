@@ -109,7 +109,12 @@ def _build_item(base, spec):
             'details': [], 'note': spec.get('note', '')}
     path = _safe_path(base, spec['file'])
     if not path or not os.path.isfile(path):
-        return item
+        # Fallback: folder hasil ditata ulang ke 02_HASIL_PENGUJIAN/ (file dipindah).
+        alt = _safe_path(base, os.path.join("02_HASIL_PENGUJIAN", spec['file']))
+        if alt and os.path.isfile(alt):
+            path = alt
+        else:
+            return item
     item['exists'] = True
     raw = _read_json(path) if spec['file'].endswith('.json') else None
     ts_str, epoch = _timestamp_info(raw, path)
