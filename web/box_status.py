@@ -70,6 +70,33 @@ def get_box_status():
             'merah': bool(lamps.get('merah')) if online else False,
         },
         'tahap18_running': bool(raw.get('tahap18_running')) if online else False,
+        'measure_status': _read_measure_status() if online else None,
         'timestamp': ts,
         'age_seconds': round(age, 1) if age is not None else None,
     }
+
+
+def _read_measure_status():
+    """Baca status pengukuran live (tahap18 draw_status). None bila tak ada/basi."""
+    from config.settings import PROGRAM_PYTHON_BASE
+    if not PROGRAM_PYTHON_BASE:
+        return None
+    path = _safe_path(PROGRAM_PYTHON_BASE,
+                      os.path.join("hasil_tahap18", "measure_status.json"))
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            raw = json.load(f)
+    except (OSError, ValueError):
+        return None
+    ts = raw.get("timestamp")
+    if ts:
+        try:
+            age = datetime.now().timestamp() - \
+                datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").timestamp()
+            if age > _STALE_SECONDS:
+                return None
+        except ValueError:
+            pass
+    return raw.get("status")

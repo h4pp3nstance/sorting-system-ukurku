@@ -355,7 +355,11 @@
         setLamp('lampKuning', d.lamps.kuning, '#f1c21b');
         setLamp('lampHijau', d.lamps.hijau, '#24a148');
         setLamp('lampMerah', d.lamps.merah, '#da1e28');
-        hint.textContent = d.tahap18_running ? 'Tahap 18 berjalan (sortir aktif)' : 'Box siap';
+        if (d.measure_status) {
+            hint.textContent = d.measure_status;
+        } else {
+            hint.textContent = d.tahap18_running ? 'Tahap 18 berjalan (sortir aktif)' : 'Box siap';
+        }
     }
 
     async function refreshBoxStatus() {
