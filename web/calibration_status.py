@@ -138,11 +138,11 @@ def get_calibration_status():
     from config.settings import PROGRAM_PYTHON_BASE
 
     if not PROGRAM_PYTHON_BASE or not os.path.isdir(PROGRAM_PYTHON_BASE):
-        return {'available': False, 'items': [], 'ready': 0, 'total': 0,
+        return {'available': False, 'entries': [], 'ready': 0, 'total': 0,
                 'base': PROGRAM_PYTHON_BASE or ''}
 
     items = [_build_item(PROGRAM_PYTHON_BASE, s) for s in _CALIBRATIONS]
     items.append(_build_item(PROGRAM_PYTHON_BASE, _NPZ))
     ready = sum(1 for it in items if it['exists'])
-    return {'available': True, 'items': items, 'ready': ready,
+    return {'available': True, 'entries': items, 'ready': ready,
             'total': len(items), 'base': PROGRAM_PYTHON_BASE}
