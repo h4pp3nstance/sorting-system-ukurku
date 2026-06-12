@@ -101,6 +101,7 @@ def _ingest_once():
         "measurement_id": mid,
         "service_type": service_type,
         "price": price,
+        "detection_image": mapped.get("detection_image"),
         "data_source": "box_tahap18",
         "mitra_id": mitra_id,
         "mitra_name": mitra_name,
