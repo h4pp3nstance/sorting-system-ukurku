@@ -611,6 +611,9 @@
                 <a href="{{ url_for('main.manual') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.manual' %}active{% endif %}">
                     Input Manual
                 </a>
+                <a href="{{ url_for('main.kalibrasi') }}" class="carbon-header__nav-link {% if request.endpoint == 'main.kalibrasi' %}active{% endif %}">
+                    Kalibrasi
+                </a>
                 {% endif %}
                 {% if user %}
                 <span class="carbon-header__nav-link" style="color: var(--carbon-gray-30); cursor: default;">
@@ -651,6 +654,15 @@
                             <path d="M7 19h18v2H7zM7 13h8v2H7z"/>
                         </svg>
                         Input Manual
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('main.kalibrasi') }}" class="carbon-sidenav__link {% if request.endpoint == 'main.kalibrasi' %}active{% endif %}">
+                        <svg class="carbon-sidenav__icon" viewBox="0 0 32 32">
+                            <path d="M16 4A12 12 0 1 0 28 16 12 12 0 0 0 16 4zm0 22a10 10 0 1 1 10-10 10 10 0 0 1-10 10z"/>
+                            <path d="M16 10a6 6 0 1 0 6 6 6 6 0 0 0-6-6zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4z"/>
+                        </svg>
+                        Kalibrasi
                     </a>
                 </li>
                 <li>

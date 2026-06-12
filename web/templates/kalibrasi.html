@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Status Kalibrasi - UkurKu{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="carbon-mb-06">
+    <h1 class="carbon-heading-04">Status Kalibrasi Sensor</h1>
+    <p class="carbon-body-01 carbon-text-secondary carbon-mt-05">
+        Status file kalibrasi alat ukur (kamera, ultrasonik, timbangan). Halaman ini hanya menampilkan;
+        kalibrasi ulang dijalankan dari terminal alat.
+    </p>
+</div>
+
+{% if not calibration.available %}
+<div class="carbon-notification carbon-notification--error carbon-mb-06">
+    <div>
+        <span class="status-dot status-dot--error"></span>
+        <strong>Folder alat ukur (program-python) tidak ditemukan.</strong>
+        <span class="carbon-text-secondary"> Status kalibrasi tidak dapat dibaca.</span>
+    </div>
+</div>
+{% else %}
+
+<!-- Ringkasan -->
+<div class="carbon-notification carbon-notification--info carbon-mb-06">
+    <div>
+        {% if calibration.ready == calibration.total %}
+        <span class="status-dot status-dot--active"></span>
+        <strong>Semua kalibrasi tersedia ({{ calibration.ready }}/{{ calibration.total }})</strong>
+        {% else %}
+        <span class="status-dot status-dot--error"></span>
+        <strong>{{ calibration.ready }}/{{ calibration.total }} kalibrasi tersedia</strong>
+        <span class="carbon-text-secondary"> — sebagian belum dikalibrasi.</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Daftar kalibrasi -->
+<div class="carbon-grid carbon-grid--cols-2 carbon-mb-06" style="gap: var(--space-05);">
+    {% for item in calibration.items %}
+    <div class="carbon-tile">
+        <div class="carbon-flex carbon-flex--between carbon-mb-05" style="align-items: flex-start;">
+            <h3 class="carbon-heading-02" style="margin: 0;">{{ item.name }}</h3>
+            {% if item.exists %}
+            <span class="carbon-tag carbon-tag--green">Tersedia</span>
+            {% else %}
+            <span class="carbon-tag carbon-tag--red">Belum ada</span>
+            {% endif %}
+        </div>
+
+        {% if item.exists %}
+        <p class="carbon-helper-text" style="margin-top: 0;">
+            {% if item.timestamp %}
+            Dikalibrasi: {{ item.timestamp }}
+            {% if item.age %}<span class="carbon-text-secondary"> ({{ item.age }})</span>{% endif %}
+            {% else %}
+            Waktu kalibrasi tidak tercatat
+            {% endif %}
+        </p>
+
+        {% if item.details %}
+        <table class="carbon-table" style="margin-top: var(--space-04);">
+            <tbody>
+                {% for label, value in item.details %}
+                <tr>
+                    <td class="carbon-text-secondary">{{ label }}</td>
+                    <td style="text-align: right; font-weight: 600;">{{ value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if item.note %}
+        <p class="carbon-helper-text carbon-mt-04">{{ item.note }}</p>
+        {% endif %}
+        {% else %}
+        <p class="carbon-helper-text" style="margin-top: 0;">
+            File <code>{{ item.file }}</code> belum dibuat. Jalankan tahap kalibrasi terkait di alat.
+        </p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<p class="carbon-helper-text">
+    Sumber: <code>{{ calibration.base }}</code>
+</p>
+
+{% endif %}
+{% endblock %}

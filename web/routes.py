@@ -647,6 +647,16 @@ def manual():
                           status=system_status)
 
 
+@main_bp.route('/kalibrasi')
+@role_required(ROLE_MITRA)
+def kalibrasi():
+    """Halaman status kalibrasi sensor (read-only dari program-python)."""
+    from web.calibration_status import get_calibration_status
+    return render_template('kalibrasi.html',
+                          status=system_status,
+                          calibration=get_calibration_status())
+
+
 # =============================================================================
 # API Endpoints
 # =============================================================================
