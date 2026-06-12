@@ -35,19 +35,24 @@ def video_feed():
 
     def generate():
         target_dt = 1.0 / _FPS if _FPS > 0 else 0
-        while True:
-            t0 = time.time()
-            if not cam.is_running():
-                break
-            jpeg = cam.get_jpeg(quality=_QUALITY)
-            if jpeg is not None:
-                yield (b"--frame\r\n"
-                       b"Content-Type: image/jpeg\r\n"
-                       b"Content-Length: " + str(len(jpeg)).encode() +
-                       b"\r\n\r\n" + jpeg + b"\r\n")
-            dt = time.time() - t0
-            if target_dt and dt < target_dt:
-                time.sleep(target_dt - dt)
+        cam.add_viewer()
+        try:
+            while True:
+                t0 = time.time()
+                if not cam.is_running():
+                    break
+                jpeg = cam.get_jpeg(quality=_QUALITY)
+                if jpeg is not None:
+                    yield (b"--frame\r\n"
+                           b"Content-Type: image/jpeg\r\n"
+                           b"Content-Length: " + str(len(jpeg)).encode() +
+                           b"\r\n\r\n" + jpeg + b"\r\n")
+                dt = time.time() - t0
+                if target_dt and dt < target_dt:
+                    time.sleep(target_dt - dt)
+        finally:
+            cam.remove_viewer()
+            cam.release_if_idle()
 
     return Response(
         generate(),

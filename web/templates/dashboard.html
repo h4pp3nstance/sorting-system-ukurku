@@ -271,22 +271,31 @@
     let hwConnected = false;
 
     let previewOn = false;
-    function togglePreview() {
+    function setPreview(on) {
         const img = document.getElementById('cameraPreview');
         const ph = document.getElementById('previewPlaceholder');
         const btn = document.getElementById('previewBtn');
-        previewOn = !previewOn;
-        if (previewOn) {
+        previewOn = on;
+        if (on) {
+            img.onerror = () => {
+                setPreview(false);
+                ph.textContent = 'Kamera tidak tersedia (mungkin sedang dipakai proses lain).';
+            };
             img.src = "{{ url_for('preview.video_feed') }}?t=" + Date.now();
             img.style.display = 'block';
             ph.style.display = 'none';
             btn.textContent = 'Hentikan Preview';
         } else {
+            img.onerror = null;
             img.src = "";
             img.style.display = 'none';
-            ph.style.display = 'block';
+            ph.style.display = 'flex';
+            if (ph.textContent.trim() === '') ph.textContent = 'Preview nonaktif';
             btn.textContent = 'Mulai Preview';
         }
+    }
+    function togglePreview() {
+        setPreview(!previewOn);
     }
 
     function renderHwStatus(connected) {
@@ -316,6 +325,8 @@
         const statusBar = document.getElementById('statusBar');
         // Disconnect saat autopilot jalan -> hentikan autopilot dulu.
         if (hwConnected && autopilotOn) { stopAutopilot(); }
+        // Disconnect melepas kamera -> hentikan preview rapi (hindari stream putus mendadak).
+        if (hwConnected && previewOn) { setPreview(false); }
         btn.disabled = true;
         const endpoint = hwConnected ? '/hardware/disconnect' : '/hardware/connect';
         try {

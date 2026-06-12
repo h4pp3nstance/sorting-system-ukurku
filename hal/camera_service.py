@@ -44,6 +44,7 @@ class CameraService:
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
+        self._viewers = 0
 
     # -----------------------------------------------------------------
     # Singleton accessors
@@ -163,3 +164,32 @@ class CameraService:
     def is_running(self):
         with self._lock:
             return self._running
+
+    # -----------------------------------------------------------------
+    # Viewer ref-count (preview lifecycle) — bukan policy, hanya bookkeeping
+    # -----------------------------------------------------------------
+    def add_viewer(self):
+        with self._lock:
+            self._viewers += 1
+            return self._viewers
+
+    def remove_viewer(self):
+        with self._lock:
+            if self._viewers > 0:
+                self._viewers -= 1
+            return self._viewers
+
+    def viewer_count(self):
+        with self._lock:
+            return self._viewers
+
+    def release_if_idle(self):
+        """Lepas kamera bila tak ada viewer & sesi pengukuran tak aktif (agar tahap18 standalone bisa pakai /dev/video0)."""
+        from web.measurement_engine import is_session_active
+        with self._lock:
+            if self._viewers > 0:
+                return False
+        if is_session_active():
+            return False
+        self.stop()
+        return True
