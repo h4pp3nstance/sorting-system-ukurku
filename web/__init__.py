@@ -24,6 +24,12 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(preview_bp)
 
+    try:
+        from .box_poller import start_box_poller
+        start_box_poller()
+    except Exception:
+        pass
+
     from .auth import current_user
 
     @app.context_processor
