@@ -1164,6 +1164,14 @@ def hardware_status():
     })
 
 
+@api_bp.route('/box/status', methods=['GET'])
+@api_login_required
+def box_status():
+    """Status box fisik (tombol+lampu) dari tahap17, read-only."""
+    from web.box_status import get_box_status
+    return jsonify({'success': True, 'data': get_box_status()})
+
+
 @api_bp.route('/hardware/connect', methods=['POST'])
 @role_required(ROLE_MITRA)
 def hardware_connect():

@@ -45,6 +45,22 @@
     </div>
 </div>
 
+<!-- Status Box Fisik (tombol + lampu dari tahap17) -->
+<div class="carbon-tile carbon-mb-06" id="boxStatusTile">
+    <div class="carbon-flex carbon-flex--between" style="align-items:center;">
+        <div class="carbon-flex" style="align-items:center; gap:var(--space-05);">
+            <strong>Status Box:</strong>
+            <span id="boxMode" class="carbon-tag carbon-tag--gray">OFFLINE</span>
+            <span class="carbon-flex" style="align-items:center; gap:var(--space-03);">
+                <span id="lampKuning" title="STANDBY" style="width:16px;height:16px;border-radius:50%;background:#3a3a3a;"></span>
+                <span id="lampHijau" title="RUN" style="width:16px;height:16px;border-radius:50%;background:#3a3a3a;"></span>
+                <span id="lampMerah" title="EMERGENCY" style="width:16px;height:16px;border-radius:50%;background:#3a3a3a;"></span>
+            </span>
+        </div>
+        <span id="boxHint" class="carbon-helper-text">Box controller (tahap17) tidak terdeteksi</span>
+    </div>
+</div>
+
 <!-- Live Preview Kamera -->
 <div class="carbon-tile carbon-mb-06">
     <div class="carbon-flex carbon-flex--between carbon-mb-05">
@@ -318,6 +334,35 @@
             const r = await API.get('/hardware/status');
             if (r.success) renderHwStatus(r.data.connected);
         } catch (e) { /* ignore */ }
+    }
+
+    function renderBoxStatus(d) {
+        const modeEl = document.getElementById('boxMode');
+        const hint = document.getElementById('boxHint');
+        const setLamp = (id, on, color) => {
+            document.getElementById(id).style.background = on ? color : '#3a3a3a';
+        };
+        if (!d || !d.online) {
+            modeEl.className = 'carbon-tag carbon-tag--gray';
+            modeEl.textContent = 'OFFLINE';
+            setLamp('lampKuning', false); setLamp('lampHijau', false); setLamp('lampMerah', false);
+            hint.textContent = 'Box controller (tahap17) tidak terdeteksi';
+            return;
+        }
+        const cls = {STOP: 'carbon-tag--blue', RUN: 'carbon-tag--green', EMERGENCY: 'carbon-tag--red'};
+        modeEl.className = 'carbon-tag ' + (cls[d.mode] || 'carbon-tag--gray');
+        modeEl.textContent = d.mode || '-';
+        setLamp('lampKuning', d.lamps.kuning, '#f1c21b');
+        setLamp('lampHijau', d.lamps.hijau, '#24a148');
+        setLamp('lampMerah', d.lamps.merah, '#da1e28');
+        hint.textContent = d.tahap18_running ? 'Tahap 18 berjalan (sortir aktif)' : 'Box siap';
+    }
+
+    async function refreshBoxStatus() {
+        try {
+            const r = await API.get('/box/status');
+            if (r.success) renderBoxStatus(r.data);
+        } catch (e) { renderBoxStatus(null); }
     }
 
     async function toggleHardware() {
@@ -740,6 +785,8 @@
         refreshHwStatus();
         setupRealTimeUpdates();
         TableSort.init('dashHistoryTable');
+        refreshBoxStatus();
+        setInterval(refreshBoxStatus, 3000);
     });
     
     // Cleanup on page unload
