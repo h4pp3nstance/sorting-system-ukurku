@@ -133,14 +133,10 @@ def _loop():
 
 
 def start_box_poller():
-    """Mulai poller (idempotent). Init _seen ke id file saat ini supaya
-    paket lama tidak di-backfill; hanya pengukuran baru yang masuk."""
-    global _started, _seen_measurement_id
+    """Mulai poller (idempotent). Dedup via _already_saved (storage), bukan suppression startup, supaya pengukuran terakhir tetap tampil setelah restart service."""
+    global _started
     with _lock:
         if _started:
             return
-        raw = _read_raw(_box_source_path())
-        if raw:
-            _seen_measurement_id = raw.get("measurement_id")
         _started = True
         threading.Thread(target=_loop, name="box-poller", daemon=True).start()
