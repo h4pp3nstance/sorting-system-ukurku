@@ -233,6 +233,32 @@
                 </button>
             </form>
         </div>
+
+        <div class="carbon-tile">
+            <h3 class="carbon-heading-02 carbon-mb-05">Ambang Klasifikasi Berat</h3>
+            <p class="carbon-helper-text carbon-mb-05">Batas berat tagihan (gram) per layanan. REGULER &le; batas1, EXPRESS &le; batas2, sisanya KARGO.</p>
+            <form method="POST" action="{{ url_for('main.admin_settings_update') }}">
+                <input type="hidden" name="section" value="klasifikasi">
+                <div class="form-group">
+                    <label class="carbon-label-01" for="reguler_max_g">Batas REGULER (g)</label>
+                    <input class="carbon-input" type="number" step="10" id="reguler_max_g"
+                           name="reguler_max_g" value="{{ settings.klasifikasi.reguler_max_g }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="express_max_g">Batas EXPRESS (g)</label>
+                    <input class="carbon-input" type="number" step="10" id="express_max_g"
+                           name="express_max_g" value="{{ settings.klasifikasi.express_max_g }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="kargo_max_g">Batas KARGO maks (g)</label>
+                    <input class="carbon-input" type="number" step="10" id="kargo_max_g"
+                           name="kargo_max_g" value="{{ settings.klasifikasi.kargo_max_g }}">
+                </div>
+                <button type="submit" class="carbon-btn carbon-btn--primary carbon-mt-05">
+                    Simpan Klasifikasi
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 

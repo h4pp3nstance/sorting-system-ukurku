@@ -21,10 +21,12 @@ def _default_settings():
     """Default settings, seed dari konstanta config/settings.py."""
     try:
         from config.settings import (
-            PRICE_REGULER, PRICE_EXPRESS, PRICE_KARGO
+            PRICE_REGULER, PRICE_EXPRESS, PRICE_KARGO,
+            WEIGHT_REGULER_MAX, WEIGHT_EXPRESS_MAX, WEIGHT_KARGO_MAX
         )
     except ImportError:
         PRICE_REGULER, PRICE_EXPRESS, PRICE_KARGO = 6000, 12000, 5000
+        WEIGHT_REGULER_MAX, WEIGHT_EXPRESS_MAX, WEIGHT_KARGO_MAX = 700, 1300, 2000
 
     return {
         "toleransi": {
@@ -36,6 +38,11 @@ def _default_settings():
             "REGULER": int(PRICE_REGULER),
             "EXPRESS": int(PRICE_EXPRESS),
             "KARGO": int(PRICE_KARGO),
+        },
+        "klasifikasi": {
+            "reguler_max_g": int(WEIGHT_REGULER_MAX),
+            "express_max_g": int(WEIGHT_EXPRESS_MAX),
+            "kargo_max_g": int(WEIGHT_KARGO_MAX),
         },
     }
 
@@ -119,9 +126,26 @@ def update_tariffs(reguler=None, express=None, kargo=None):
     return save_settings(settings)
 
 
+def update_classification(reguler_max_g=None, express_max_g=None, kargo_max_g=None):
+    """Update sebagian/seluruh ambang klasifikasi berat; nilai None tidak diubah."""
+    settings = load_settings()
+    kls = settings["klasifikasi"]
+    if reguler_max_g is not None:
+        kls["reguler_max_g"] = int(_coerce_number(reguler_max_g, kls["reguler_max_g"]))
+    if express_max_g is not None:
+        kls["express_max_g"] = int(_coerce_number(express_max_g, kls["express_max_g"]))
+    if kargo_max_g is not None:
+        kls["kargo_max_g"] = int(_coerce_number(kargo_max_g, kls["kargo_max_g"]))
+    return save_settings(settings)
+
+
 def get_tolerances():
     return load_settings()["toleransi"]
 
 
 def get_tariffs():
     return load_settings()["tarif"]
+
+
+def get_classification():
+    return load_settings()["klasifikasi"]

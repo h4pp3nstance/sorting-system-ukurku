@@ -125,18 +125,18 @@
                 <tbody>
                     <tr>
                         <td><span class="carbon-tag carbon-tag--blue">REGULER</span></td>
-                        <td>≤ 700 gram</td>
-                        <td>Rp 6,000</td>
+                        <td>&le; {{ klasifikasi.reguler_max_g }} gram</td>
+                        <td>Rp {{ "{:,}".format(tarif.REGULER) }}</td>
                     </tr>
                     <tr>
                         <td><span class="carbon-tag carbon-tag--purple">EXPRESS</span></td>
-                        <td>701 - 1300 gram</td>
-                        <td>Rp 12,000</td>
+                        <td>{{ klasifikasi.reguler_max_g + 1 }} - {{ klasifikasi.express_max_g }} gram</td>
+                        <td>Rp {{ "{:,}".format(tarif.EXPRESS) }}</td>
                     </tr>
                     <tr>
                         <td><span class="carbon-tag carbon-tag--teal">KARGO</span></td>
-                        <td>1301 - 2000 gram</td>
-                        <td>Rp 5,000</td>
+                        <td>{{ klasifikasi.express_max_g + 1 }} - {{ klasifikasi.kargo_max_g }} gram</td>
+                        <td>Rp {{ "{:,}".format(tarif.KARGO) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -179,17 +179,17 @@
 
 {% block extra_js %}
 <script>
-    // Classification thresholds
+    // Classification thresholds (dinamis dari settings_store)
     const THRESHOLDS = {
-        REGULER_MAX: 700,
-        EXPRESS_MAX: 1300,
-        KARGO_MAX: 2000
+        REGULER_MAX: {{ klasifikasi.reguler_max_g }},
+        EXPRESS_MAX: {{ klasifikasi.express_max_g }},
+        KARGO_MAX: {{ klasifikasi.kargo_max_g }}
     };
     
     const PRICES = {
-        REGULER: 6000,
-        EXPRESS: 12000,
-        KARGO: 5000
+        REGULER: {{ tarif.REGULER }},
+        EXPRESS: {{ tarif.EXPRESS }},
+        KARGO: {{ tarif.KARGO }}
     };
     
     // Auto-calculate on input change

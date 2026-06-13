@@ -124,19 +124,33 @@ def map_to_package_format(raw: dict, program_python_base: str = "") -> dict:
 def classify_package(chargeable_weight_g: float) -> tuple:
     """
     Klasifikasi paket berdasarkan chargeable weight.
+    Ambang & tarif dibaca dari settings_store (dinamis); fallback ke
+    konstanta config bila settings tak tersedia.
     Returns (service_type, price).
     """
-    from config.settings import (
-        WEIGHT_REGULER_MAX, WEIGHT_EXPRESS_MAX,
-        PRICE_REGULER, PRICE_EXPRESS, PRICE_KARGO
-    )
+    try:
+        from web.settings_store import get_classification, get_tariffs
+        kls = get_classification()
+        tarif = get_tariffs()
+        reguler_max = kls["reguler_max_g"]
+        express_max = kls["express_max_g"]
+        price_reguler = tarif["REGULER"]
+        price_express = tarif["EXPRESS"]
+        price_kargo = tarif["KARGO"]
+    except Exception:
+        from config.settings import (
+            WEIGHT_REGULER_MAX, WEIGHT_EXPRESS_MAX,
+            PRICE_REGULER, PRICE_EXPRESS, PRICE_KARGO
+        )
+        reguler_max, express_max = WEIGHT_REGULER_MAX, WEIGHT_EXPRESS_MAX
+        price_reguler, price_express, price_kargo = PRICE_REGULER, PRICE_EXPRESS, PRICE_KARGO
 
-    if chargeable_weight_g <= WEIGHT_REGULER_MAX:
-        return 'REGULER', PRICE_REGULER
-    elif chargeable_weight_g <= WEIGHT_EXPRESS_MAX:
-        return 'EXPRESS', PRICE_EXPRESS
+    if chargeable_weight_g <= reguler_max:
+        return 'REGULER', price_reguler
+    elif chargeable_weight_g <= express_max:
+        return 'EXPRESS', price_express
     else:
-        return 'KARGO', PRICE_KARGO
+        return 'KARGO', price_kargo
 
 
 def get_measurement_from_file(

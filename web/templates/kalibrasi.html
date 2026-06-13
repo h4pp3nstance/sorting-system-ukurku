@@ -88,5 +88,62 @@
     Sumber: <code>{{ calibration.base }}</code>
 </p>
 
+<div class="carbon-mt-07">
+    <h2 class="carbon-heading-03 carbon-mb-05">Pengaturan Klasifikasi &amp; Tarif</h2>
+    <div class="carbon-grid carbon-grid--cols-2">
+        <div class="carbon-tile">
+            <h3 class="carbon-heading-02 carbon-mb-05">Ambang Klasifikasi Berat</h3>
+            <p class="carbon-helper-text carbon-mb-05">Batas berat tagihan (gram) per layanan.</p>
+            <form method="POST" action="{{ url_for('main.admin_settings_update') }}">
+                <input type="hidden" name="section" value="klasifikasi">
+                <div class="form-group">
+                    <label class="carbon-label-01" for="reguler_max_g">Batas REGULER (g)</label>
+                    <input class="carbon-input" type="number" step="10" id="reguler_max_g"
+                           name="reguler_max_g" value="{{ klasifikasi.reguler_max_g }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="express_max_g">Batas EXPRESS (g)</label>
+                    <input class="carbon-input" type="number" step="10" id="express_max_g"
+                           name="express_max_g" value="{{ klasifikasi.express_max_g }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="kargo_max_g">Batas KARGO maks (g)</label>
+                    <input class="carbon-input" type="number" step="10" id="kargo_max_g"
+                           name="kargo_max_g" value="{{ klasifikasi.kargo_max_g }}">
+                </div>
+                <button type="submit" class="carbon-btn carbon-btn--primary carbon-mt-05">
+                    Simpan Klasifikasi
+                </button>
+            </form>
+        </div>
+
+        <div class="carbon-tile">
+            <h3 class="carbon-heading-02 carbon-mb-05">Tarif Layanan</h3>
+            <p class="carbon-helper-text carbon-mb-05">Harga per jenis layanan (Rupiah).</p>
+            <form method="POST" action="{{ url_for('main.admin_settings_update') }}">
+                <input type="hidden" name="section" value="tarif">
+                <div class="form-group">
+                    <label class="carbon-label-01" for="reguler">REGULER</label>
+                    <input class="carbon-input" type="number" step="500" id="reguler"
+                           name="reguler" value="{{ tarif.REGULER }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="express">EXPRESS</label>
+                    <input class="carbon-input" type="number" step="500" id="express"
+                           name="express" value="{{ tarif.EXPRESS }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="kargo">KARGO</label>
+                    <input class="carbon-input" type="number" step="500" id="kargo"
+                           name="kargo" value="{{ tarif.KARGO }}">
+                </div>
+                <button type="submit" class="carbon-btn carbon-btn--primary carbon-mt-05">
+                    Simpan Tarif
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endif %}
 {% endblock %}

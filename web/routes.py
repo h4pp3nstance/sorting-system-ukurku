@@ -455,10 +455,15 @@ def admin_user_delete():
 
 
 @main_bp.route('/admin/settings', methods=['POST'])
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, ROLE_MITRA)
 def admin_settings_update():
-    from web.settings_store import update_tolerances, update_tariffs
+    from web.settings_store import update_tolerances, update_tariffs, update_classification
+    is_admin = (current_user() or {}).get('role') == ROLE_ADMIN
     section = request.form.get('section')
+    # Toleransi (validasi MPC) admin-only; Mitra hanya klasifikasi & tarif.
+    if section == 'toleransi' and not is_admin:
+        flash('Anda tidak memiliki akses ke pengaturan ini.', 'error')
+        return redirect(url_for('main.kalibrasi'))
     if section == 'toleransi':
         update_tolerances(
             dimensi_cm=request.form.get('dimensi_cm'),
@@ -473,9 +478,18 @@ def admin_settings_update():
             kargo=request.form.get('kargo'),
         )
         flash('Tarif layanan disimpan.', 'success')
+    elif section == 'klasifikasi':
+        update_classification(
+            reguler_max_g=request.form.get('reguler_max_g'),
+            express_max_g=request.form.get('express_max_g'),
+            kargo_max_g=request.form.get('kargo_max_g'),
+        )
+        flash('Ambang klasifikasi berat disimpan.', 'success')
     else:
         flash('Bagian pengaturan tidak dikenali.', 'error')
-    return redirect(url_for('main.admin_dashboard'))
+    if is_admin:
+        return redirect(url_for('main.admin_dashboard'))
+    return redirect(url_for('main.kalibrasi'))
 
 
 @main_bp.route('/history')
@@ -643,8 +657,11 @@ def package_evidence(package_id):
 @role_required(ROLE_MITRA)
 def manual():
     """Manual measurement page"""
+    from web.settings_store import get_classification, get_tariffs
     return render_template('manual.html',
-                          status=system_status)
+                          status=system_status,
+                          klasifikasi=get_classification(),
+                          tarif=get_tariffs())
 
 
 @main_bp.route('/kalibrasi')
@@ -652,9 +669,12 @@ def manual():
 def kalibrasi():
     """Halaman status kalibrasi sensor (read-only dari program-python)."""
     from web.calibration_status import get_calibration_status
+    from web.settings_store import get_classification, get_tariffs
     return render_template('kalibrasi.html',
                           status=system_status,
-                          calibration=get_calibration_status())
+                          calibration=get_calibration_status(),
+                          klasifikasi=get_classification(),
+                          tarif=get_tariffs())
 
 
 # =============================================================================
