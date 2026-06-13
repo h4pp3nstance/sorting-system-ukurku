@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Database - UkurKu{% endblock %}
+
+{% block content %}
+<div class="carbon-mb-06">
+    <h1 class="carbon-heading-04">Database (Read-Only)</h1>
+    <p class="carbon-body-01 carbon-text-secondary carbon-mt-05">
+        Lihat isi database SQLite langsung dari web. Hanya baca; tidak bisa mengubah data.
+    </p>
+</div>
+
+{% if db_error %}
+<div class="carbon-notification carbon-notification--error carbon-mb-06">
+    <div><span class="status-dot status-dot--error"></span>
+        <strong>{{ db_error }}</strong></div>
+</div>
+{% endif %}
+
+<div class="carbon-grid carbon-grid--cols-2" style="gap: var(--space-06); align-items: start;">
+    <!-- Daftar tabel -->
+    <div class="carbon-tile">
+        <h3 class="carbon-heading-02 carbon-mb-05">Tabel</h3>
+        {% if tables %}
+        <table class="carbon-table">
+            <thead><tr><th>Nama</th><th>Tipe</th><th style="text-align:right;">Baris</th></tr></thead>
+            <tbody>
+                {% for t in tables %}
+                <tr style="cursor:pointer;" onclick="loadTable('{{ t.name }}')">
+                    <td><a href="javascript:void(0)" onclick="loadTable('{{ t.name }}')">{{ t.name }}</a></td>
+                    <td><span class="carbon-tag carbon-tag--gray">{{ t.type }}</span></td>
+                    <td style="text-align:right;">{{ t.rows if t.rows is not none else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="carbon-helper-text">Tidak ada tabel.</p>
+        {% endif %}
+    </div>
+
+    <!-- Query SELECT -->
+    <div class="carbon-tile">
+        <h3 class="carbon-heading-02 carbon-mb-05">Query SQL (SELECT saja)</h3>
+        <p class="carbon-helper-text carbon-mb-05">Hanya SELECT. Maks 500 baris.</p>
+        <textarea id="sqlBox" class="carbon-input" rows="4"
+                  style="font-family:var(--font-mono,monospace);width:100%;"
+                  placeholder="SELECT * FROM packages LIMIT 20"></textarea>
+        <button class="carbon-btn carbon-btn--primary carbon-mt-05" onclick="runQuery()">
+            Jalankan Query
+        </button>
+    </div>
+</div>
+
+<!-- Hasil -->
+<div class="carbon-tile carbon-mt-06">
+    <div class="carbon-flex carbon-flex--between carbon-mb-05" style="align-items:center;">
+        <h3 class="carbon-heading-02" id="resultTitle" style="margin:0;">Hasil</h3>
+        <span id="resultMeta" class="carbon-helper-text"></span>
+    </div>
+    <div id="resultArea" style="overflow:auto;max-height:60vh;">
+        <p class="carbon-helper-text">Pilih tabel di kiri, atau jalankan query.</p>
+    </div>
+    <div id="pager" class="carbon-flex carbon-mt-05" style="gap:var(--space-04);display:none;">
+        <button class="carbon-btn carbon-btn--tertiary carbon-btn--sm" onclick="pagePrev()">&laquo; Sebelumnya</button>
+        <button class="carbon-btn carbon-btn--tertiary carbon-btn--sm" onclick="pageNext()">Berikutnya &raquo;</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let curTable = null, curOffset = 0, curLimit = 100, curTotal = 0;
+
+    function esc(v) {
+        if (v === null || v === undefined) return '<span style="color:#8d8d8d;">NULL</span>';
+        return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function renderTable(columns, rows) {
+        if (!columns.length) return '<p class="carbon-helper-text">Tidak ada kolom.</p>';
+        let h = '<table class="carbon-table"><thead><tr>';
+        columns.forEach(c => h += '<th>' + esc(c) + '</th>');
+        h += '</tr></thead><tbody>';
+        if (!rows.length) h += '<tr><td colspan="' + columns.length + '" class="carbon-text-secondary">Tidak ada baris.</td></tr>';
+        rows.forEach(r => {
+            h += '<tr>';
+            r.forEach(cell => h += '<td style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(cell) + '">' + esc(cell) + '</td>');
+            h += '</tr>';
+        });
+        return h + '</tbody></table>';
+    }
+
+    async function loadTable(name, offset) {
+        curTable = name; curOffset = offset || 0;
+        try {
+            const r = await API.get('/admin/db/table/' + encodeURIComponent(name) + '?limit=' + curLimit + '&offset=' + curOffset);
+            if (!r.success) { showError(r.error); return; }
+            const d = r.data;
+            curTotal = d.total;
+            document.getElementById('resultTitle').textContent = 'Tabel: ' + name;
+            document.getElementById('resultMeta').textContent =
+                'Menampilkan ' + d.rows.length + ' dari ' + d.total + ' baris (offset ' + d.offset + ')';
+            document.getElementById('resultArea').innerHTML = renderTable(d.columns, d.rows);
+            document.getElementById('pager').style.display = (d.total > curLimit) ? 'flex' : 'none';
+        } catch (e) { showError(e.message); }
+    }
+
+    function pageNext() {
+        if (!curTable) return;
+        if (curOffset + curLimit < curTotal) loadTable(curTable, curOffset + curLimit);
+    }
+    function pagePrev() {
+        if (!curTable) return;
+        loadTable(curTable, Math.max(0, curOffset - curLimit));
+    }
+
+    async function runQuery() {
+        const sql = document.getElementById('sqlBox').value;
+        try {
+            const r = await API.post('/admin/db/query', { sql: sql });
+            if (!r.success) { showError(r.error); return; }
+            const d = r.data;
+            document.getElementById('resultTitle').textContent = 'Hasil Query';
+            document.getElementById('resultMeta').textContent =
+                d.rows.length + ' baris' + (d.rows.length >= d.truncated_at ? ' (dipotong di ' + d.truncated_at + ')' : '');
+            document.getElementById('resultArea').innerHTML = renderTable(d.columns, d.rows);
+            document.getElementById('pager').style.display = 'none';
+        } catch (e) { showError(e.message); }
+    }
+
+    function showError(msg) {
+        document.getElementById('resultTitle').textContent = 'Error';
+        document.getElementById('resultMeta').textContent = '';
+        document.getElementById('resultArea').innerHTML =
+            '<div class="carbon-notification carbon-notification--error"><div><strong>' + esc(msg) + '</strong></div></div>';
+        document.getElementById('pager').style.display = 'none';
+    }
+</script>
+{% endblock %}

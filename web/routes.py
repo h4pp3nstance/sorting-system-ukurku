@@ -409,6 +409,55 @@ def admin_dashboard():
                           all_packages=storage.get_all_packages(100))
 
 
+@main_bp.route('/admin/db')
+@role_required(ROLE_ADMIN)
+def admin_db_viewer():
+    """Halaman SQLite viewer (read-only, admin-only) - pengganti DBeaver."""
+    from web.db_viewer import list_tables
+    try:
+        tables = list_tables()
+        error = None
+    except Exception as e:
+        tables = []
+        error = str(e)
+    return render_template('admin_db.html',
+                          status=system_status,
+                          tables=tables,
+                          db_error=error)
+
+
+@api_bp.route('/admin/db/table/<name>', methods=['GET'])
+@api_role_required(ROLE_ADMIN)
+def api_db_table(name):
+    """Baris + skema satu tabel (read-only, paginated)."""
+    from web.db_viewer import table_rows, table_schema
+    limit = request.args.get('limit', 100, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    try:
+        data = table_rows(name, limit=limit, offset=offset)
+        data['schema'] = table_schema(name)
+        return jsonify({'success': True, 'data': data})
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/admin/db/query', methods=['POST'])
+@api_role_required(ROLE_ADMIN)
+def api_db_query():
+    """Jalankan query SELECT read-only (guarded)."""
+    from web.db_viewer import run_select
+    payload = request.get_json(silent=True) or {}
+    sql = payload.get('sql', '')
+    try:
+        return jsonify({'success': True, 'data': run_select(sql)})
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 422
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @main_bp.route('/admin/users/create', methods=['POST'])
 @role_required(ROLE_ADMIN)
 def admin_user_create():
