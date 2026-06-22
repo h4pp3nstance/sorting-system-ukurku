@@ -135,6 +135,16 @@ class InMemoryStorage:
         self._next_id = 1
         return True
 
+    def update_package_parties(self, package_id, sender=None, recipient=None):
+        for p in self.packages:
+            if str(p['id']) == str(package_id):
+                if sender is not None:
+                    p['sender'] = sender
+                if recipient is not None:
+                    p['recipient'] = recipient
+                return True
+        return False
+
 
 # System status (always in-memory for runtime state)
 system_status = {
@@ -236,6 +246,78 @@ def api_notification_read():
     return jsonify({'success': ok})
 
 
+def _send_validation_notification(package_id, to_mitra_id, result,
+                                  source_label='validasi'):
+    """Kirim notifikasi ke Mitra untuk SEMUA 3 status (valid/perlu_review/
+    tidak_sesuai). Title + message disesuaikan per status biar Mitra langsung
+    paham hasilnya. Idempotent dari sisi caller (create_notification append).
+    """
+    from web import mpc_store
+    status = result.get('status')
+    status_label = result.get('status_label') or status or '-'
+    if status == 'valid':
+        title = 'Validasi Sesuai: Paket #{}'.format(package_id)
+        message = ('Paket #{} telah diukur ulang oleh MPC ({}) dan hasilnya '
+                   'SESUAI dengan pengukuran Anda.').format(
+                       package_id, source_label)
+    elif status == 'perlu_review':
+        title = 'Validasi Perlu Review: Paket #{}'.format(package_id)
+        message = ('Paket #{} diukur ulang oleh MPC ({}) dan terdapat selisih '
+                   'kecil. Mohon ditinjau ulang.').format(
+                       package_id, source_label)
+    else:
+        title = 'Validasi Tidak Sesuai: Paket #{}'.format(package_id)
+        message = ('Paket #{} diukur ulang oleh MPC ({}) dan hasilnya '
+                   'BERBEDA signifikan ({}). Mohon ditindaklanjuti.').format(
+                       package_id, source_label, status_label)
+    try:
+        mpc_store.create_notification(
+            package_id=package_id,
+            to_mitra_id=to_mitra_id,
+            title=title,
+            message=message,
+            status=status,
+        )
+    except Exception:
+        # Notif gagal tidak boleh blocking response validasi.
+        pass
+
+
+# Set measurement_id yang sudah di-handle oleh validasi web (in-process).
+# Box_poller akan skip save_package untuk mid ini supaya tidak dobel ingest.
+# Auto-cleanup setelah _CLAIMED_MID_TTL_SECONDS supaya tidak grow unbounded.
+_claimed_measurement_ids = {}
+_claimed_mid_lock = threading.Lock()
+_CLAIMED_MID_TTL_SECONDS = 600  # 10 menit cukup; box_poller poll tiap 3 detik.
+
+
+def claim_measurement_id(mid):
+    """Tandai measurement_id sebagai sudah dikonsumsi oleh validasi web."""
+    if not mid:
+        return
+    now = datetime.now()
+    with _claimed_mid_lock:
+        _claimed_measurement_ids[str(mid)] = now
+        expired = [k for k, ts in _claimed_measurement_ids.items()
+                   if (now - ts).total_seconds() > _CLAIMED_MID_TTL_SECONDS]
+        for k in expired:
+            _claimed_measurement_ids.pop(k, None)
+
+
+def is_measurement_claimed(mid):
+    """True kalau mid sudah di-claim validasi web (box_poller harus skip)."""
+    if not mid:
+        return False
+    with _claimed_mid_lock:
+        ts = _claimed_measurement_ids.get(str(mid))
+        if not ts:
+            return False
+        if (datetime.now() - ts).total_seconds() > _CLAIMED_MID_TTL_SECONDS:
+            _claimed_measurement_ids.pop(str(mid), None)
+            return False
+        return True
+
+
 @main_bp.route('/mpc')
 @role_required(ROLE_MPC)
 def mpc_dashboard():
@@ -244,12 +326,18 @@ def mpc_dashboard():
     storage = get_storage()
     packages = storage.get_all_packages(100)
     validations = {v['package_id']: v for v in mpc_store.list_validations()}
+    attempts_by_pkg = {}
+    for pkg in packages:
+        pid = str(pkg.get('id'))
+        attempts_by_pkg[pid] = mpc_store.list_attempts(pid)
     return render_template('mpc.html',
                           status=system_status,
                           packages=packages,
                           validations=validations,
+                          attempts_by_pkg=attempts_by_pkg,
                           val_stats=mpc_store.validation_stats(),
-                          notifications=mpc_store.list_notifications())
+                          notifications=mpc_store.list_notifications(),
+                          mpc_arm=mpc_store.get_armed())
 
 
 @main_bp.route('/mpc/validate/<package_id>')
@@ -268,7 +356,8 @@ def mpc_validate_page(package_id):
                           status=system_status,
                           package=package,
                           mitra_measurement=extract_measurement(package),
-                          existing=mpc_store.get_validation(package_id))
+                          existing=mpc_store.get_validation(package_id),
+                          attempts=mpc_store.list_attempts(package_id))
 
 
 @api_bp.route('/mpc/validate', methods=['POST'])
@@ -318,21 +407,28 @@ def api_mpc_validate():
                                   get_tolerances())
 
     user = current_user() or {}
-    mpc_store.save_validation(
+    mitra_snapshot = extract_measurement(package)
+    attempt = mpc_store.add_validation_attempt(
         package_id, mpc_measurement, result,
         mpc_username=user.get('username'),
         catatan=payload.get('catatan'),
+        data_source='mpc_manual_input',
+        mitra_snapshot=mitra_snapshot,
+        sensor_status='manual',
     )
 
-    if result['status'] in (STATUS_TIDAK_SESUAI, STATUS_PERLU_REVIEW):
-        mpc_store.create_notification(
-            package_id=package_id,
-            to_mitra_id=package.get('mitra_id'),
-            title='Validasi: ' + result['status_label'],
-            message='Paket #{} dinyatakan {} oleh MPC.'.format(
-                package_id, result['status_label']),
-            status=result['status'],
-        )
+    _send_validation_notification(
+        package_id=package_id,
+        to_mitra_id=package.get('mitra_id'),
+        result=result,
+        source_label='input manual',
+    )
+
+    broadcast_event('mpc_validated', {
+        'package_id': str(package_id),
+        'result': result,
+        'attempt': attempt,
+    })
 
     return jsonify({'success': True, 'data': {
         'status': result['status'],
@@ -340,7 +436,326 @@ def api_mpc_validate():
         'selisih': result['selisih'],
         'breaches': result['breaches'],
         'mpc_measurement': mpc_measurement,
+        'attempt_no': attempt['attempt_no'],
     }})
+
+
+@api_bp.route('/station/status', methods=['GET'])
+@api_login_required
+def api_station_status():
+    """Status stasiun ukur fisik: idle / sedang dipakai mode apa & oleh siapa.
+
+    Termasuk indikator tahap18 (CLI legacy) yang juga klaim kamera saat aktif.
+    """
+    from web import station_lock, camera_lock, mpc_store
+    data = station_lock.status()
+    data.update(camera_lock.status_payload())
+    data['mpc_arm'] = mpc_store.get_armed()
+    return jsonify({'success': True, 'data': data})
+
+
+@api_bp.route('/mpc/arm', methods=['GET'])
+@api_login_required
+def api_mpc_arm_status():
+    from web import mpc_store
+    return jsonify({'success': True, 'data': {'armed': mpc_store.get_armed()}})
+
+
+@api_bp.route('/mpc/arm', methods=['POST'])
+@api_login_required
+def api_mpc_arm():
+    """Arm sistem untuk re-measure MPC paket terpilih.
+
+    Body JSON: {"package_id": "<id>"}. Pengukuran tahap18 berikutnya akan di-
+    klaim sebagai pengukuran MPC untuk paket ini (lewat box_poller).
+    """
+    from web import mpc_store
+    payload = request.get_json(silent=True) or {}
+    package_id = payload.get('package_id')
+    if not package_id:
+        return jsonify({'success': False, 'error': 'package_id wajib.'}), 400
+
+    storage = get_storage()
+    if not storage.get_package(package_id):
+        return jsonify({'success': False, 'error': 'Paket tidak ditemukan.'}), 404
+
+    user = current_user() or {}
+    ok, arm = mpc_store.arm_mpc(package_id, armed_by=user.get('username'))
+    if not ok:
+        return jsonify({
+            'success': False,
+            'error': 'Sudah ada paket lain yang menunggu pengukuran ulang.',
+            'error_type': 'already_armed',
+            'armed': arm,
+        }), 409
+
+    broadcast_event('mpc_armed', {'armed': arm})
+    return jsonify({'success': True, 'data': {'armed': arm}})
+
+
+@api_bp.route('/mpc/arm/cancel', methods=['POST'])
+@api_login_required
+def api_mpc_arm_cancel():
+    from web import mpc_store
+    user = current_user() or {}
+    cleared = mpc_store.cancel_armed(by_user=user.get('username'))
+    if cleared:
+        broadcast_event('mpc_arm_cancelled', {'armed': cleared})
+    return jsonify({'success': True, 'data': {'cancelled': cleared}})
+
+
+@api_bp.route('/form/draft', methods=['GET'])
+@api_login_required
+def api_form_draft_get():
+    """Return draft pengirim/penerima aktif untuk Mitra saat ini (dashboard restore)."""
+    from web import mpc_store
+    user = current_user() or {}
+    mitra_id = user.get('mitra_id')
+    if not mitra_id:
+        return jsonify({'success': True, 'data': {'draft': None}})
+    draft = mpc_store.get_form_draft(mitra_id)
+    return jsonify({'success': True, 'data': {'draft': draft}})
+
+
+@api_bp.route('/form/draft', methods=['POST'])
+@api_login_required
+def api_form_draft_save():
+    """Simpan/refresh draft pengirim/penerima dari dashboard (debounced auto-save).
+
+    Body JSON: {"sender": {nama, telepon, alamat}, "recipient": {...}}
+    Empty/blank payload meng-clear draft. Scope per Mitra (mitra_id session).
+    TTL default 5 menit (FORM_DRAFT_DEFAULT_TTL_SECONDS).
+    """
+    from web import mpc_store
+    user = current_user() or {}
+    mitra_id = user.get('mitra_id')
+    if not mitra_id:
+        return jsonify({
+            'success': False,
+            'error': 'Hanya Mitra yang bisa menyimpan draft form.',
+            'error_type': 'not_a_mitra',
+        }), 403
+    payload = request.get_json(silent=True) or {}
+    sender = _extract_party(payload, 'sender') or None
+    recipient = _extract_party(payload, 'recipient') or None
+    draft = mpc_store.set_form_draft(mitra_id, sender=sender, recipient=recipient)
+    return jsonify({'success': True, 'data': {'draft': draft}})
+
+
+@api_bp.route('/form/draft', methods=['DELETE'])
+@api_login_required
+def api_form_draft_clear():
+    """Hapus draft form (dipakai saat Mitra reset form atau setelah paket masuk)."""
+    from web import mpc_store
+    user = current_user() or {}
+    mitra_id = user.get('mitra_id')
+    if not mitra_id:
+        return jsonify({'success': True, 'data': {'cleared': None}})
+    cleared = mpc_store.clear_form_draft(mitra_id)
+    return jsonify({'success': True, 'data': {'cleared': cleared}})
+
+
+@api_bp.route('/packages/<package_id>/parties', methods=['PATCH'])
+@api_login_required
+def api_package_update_parties(package_id):
+    """Backfill sender/recipient untuk paket existing.
+
+    Dipakai dashboard 'Lengkapi Data Pengirim' untuk paket box_tahap18 lama
+    yang masuk tanpa form data. Scope IDOR: Mitra hanya boleh edit paketnya
+    sendiri. Wajib salah satu (sender atau recipient) tidak kosong.
+    """
+    package = _get_scoped_package(package_id)
+    if not package:
+        return jsonify({
+            'success': False,
+            'error': 'Paket tidak ditemukan.',
+            'error_type': 'not_found',
+        }), 404
+
+    payload = request.get_json(silent=True) or {}
+    sender = _extract_party(payload, 'sender') or None
+    recipient = _extract_party(payload, 'recipient') or None
+    if sender is None and recipient is None:
+        return jsonify({
+            'success': False,
+            'error': 'Minimal salah satu (pengirim/penerima) wajib diisi.',
+            'error_type': 'empty_payload',
+        }), 422
+
+    if sender is not None and not sender.get('nama'):
+        return jsonify({
+            'success': False,
+            'error': 'Nama pengirim tidak boleh kosong.',
+            'error_type': 'missing_sender_name',
+        }), 422
+    if recipient is not None and not recipient.get('nama'):
+        return jsonify({
+            'success': False,
+            'error': 'Nama penerima tidak boleh kosong.',
+            'error_type': 'missing_recipient_name',
+        }), 422
+
+    storage = get_storage()
+    ok = storage.update_package_parties(package_id, sender=sender,
+                                         recipient=recipient)
+    if not ok:
+        return jsonify({
+            'success': False,
+            'error': 'Gagal memperbarui paket di storage.',
+            'error_type': 'storage_error',
+        }), 500
+
+    updated = storage.get_package(package_id) or package
+    broadcast_event('package_parties_updated', {
+        'package_id': package_id,
+        'sender': updated.get('sender'),
+        'recipient': updated.get('recipient'),
+    })
+    return jsonify({'success': True, 'data': {'package': updated}})
+
+
+@api_bp.route('/mpc/measure', methods=['POST'])
+@api_login_required
+def api_mpc_measure():
+    """Validasi MPC OTOMATIS: ukur ulang paket pakai sensor fisik yang sama,
+    lalu bandingkan dengan pengukuran Mitra. Menggantikan input manual.
+
+    Alur: kunci stasiun -> measure_real() -> sanity check paket ada ->
+    compare vs snapshot Mitra (orientasi dinormalisasi) -> catat attempt ->
+    notifikasi Mitra hanya bila hasil final tidak_sesuai/perlu_review.
+    """
+    from web import mpc_store, station_lock, camera_lock
+    from web.validation_engine import (
+        compare_measurements, extract_measurement, is_package_present,
+    )
+    from web.settings_store import get_tolerances
+    from web.measurement_engine import (
+        measure_real,
+        MeasurementUnavailableError,
+        NeedCalibrationError,
+        MeasurementTimeoutError,
+        MeasurementEngineError,
+    )
+
+    payload = request.get_json(silent=True) or {}
+    package_id = payload.get('package_id')
+
+    storage = get_storage()
+    package = storage.get_package(package_id) if package_id else None
+    if not package:
+        return jsonify({'success': False,
+                        'error': 'Paket tidak ditemukan.'}), 404
+
+    cam_ok, cam_msg, cam_pids = camera_lock.ensure_web_can_use_camera()
+    if not cam_ok:
+        return jsonify({
+            'success': False,
+            'error': cam_msg,
+            'error_type': 'camera_busy_tahap18',
+            'tahap18_pids': cam_pids,
+        }), 409
+
+    user = current_user() or {}
+    ok, st = station_lock.acquire(station_lock.MODE_MPC,
+                                  owner=user.get('username'))
+    if not ok:
+        return jsonify({
+            'success': False,
+            'error': 'Alat ukur sedang dipakai oleh {} ({}).'.format(
+                st.get('owner') or 'pengguna lain', st.get('mode')),
+            'error_type': 'station_busy'
+        }), 409
+
+    try:
+        try:
+            mapped = measure_real()
+        except camera_lock.CameraBusyError as e:
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'error_type': 'camera_busy_tahap18',
+                'tahap18_pids': getattr(e, 'pids', []),
+            }), 409
+        except NeedCalibrationError as e:
+            return jsonify({'success': False,
+                            'error': 'Sistem belum dikalibrasi. ' + str(e),
+                            'error_type': 'need_calibration'}), 422
+        except MeasurementTimeoutError:
+            return jsonify({
+                'success': False,
+                'error': 'Paket tidak terdeteksi. Letakkan paket di area '
+                         'ukur lalu coba lagi.',
+                'error_type': 'needs_remeasure'}), 422
+        except MeasurementUnavailableError:
+            return jsonify({
+                'success': False,
+                'error': 'Perangkat pengukuran tidak tersedia.',
+                'error_type': 'sensor_error'}), 503
+        except MeasurementEngineError as e:
+            return jsonify({'success': False, 'error': str(e),
+                            'error_type': 'sensor_error'}), 422
+
+        # measure_real() menulis JSON ke hasil_tahap18/. Claim mid-nya sekarang
+        # supaya box_poller skip save_package (tidak nambah row "Paket Masuk"
+        # untuk paket validasi).
+        claim_measurement_id(mapped.get('measurement_id'))
+
+        mpc_measurement = {
+            'panjang': mapped['panjang'], 'lebar': mapped['lebar'],
+            'tinggi': mapped['tinggi'],
+            'berat_aktual': mapped['berat_aktual'],
+            'berat_volumetrik': mapped['berat_volumetrik'],
+            'chargeable_weight': mapped['chargeable_weight'],
+        }
+
+        if not is_package_present(mpc_measurement):
+            return jsonify({
+                'success': False,
+                'error': 'Paket tidak terdeteksi di alat (berat/dimensi '
+                         'mendekati nol). Letakkan paket lalu ukur lagi.',
+                'error_type': 'needs_remeasure'}), 422
+
+        mitra_snapshot = extract_measurement(package)
+        result = compare_measurements(mitra_snapshot, mpc_measurement,
+                                      get_tolerances(),
+                                      normalize_orientation=True)
+
+        attempt = mpc_store.add_validation_attempt(
+            package_id, mpc_measurement, result,
+            mpc_username=user.get('username'),
+            catatan=payload.get('catatan'),
+            data_source='mpc_in_process',
+            mitra_snapshot=mitra_snapshot,
+            sensor_status='ok',
+        )
+
+        _send_validation_notification(
+            package_id=package_id,
+            to_mitra_id=package.get('mitra_id'),
+            result=result,
+            source_label='sensor web',
+        )
+
+        broadcast_event('mpc_validated', {
+            'package_id': str(package_id),
+            'result': result,
+            'attempt': attempt,
+        })
+
+        return jsonify({'success': True, 'data': {
+            'status': result['status'],
+            'status_label': result['status_label'],
+            'selisih': result['selisih'],
+            'breaches': result['breaches'],
+            'mpc_measurement': mpc_measurement,
+            'attempt_no': attempt['attempt_no'],
+        }})
+    except Exception as e:
+        return jsonify({'success': False,
+                        'error': 'Terjadi kesalahan tak terduga: ' + str(e),
+                        'error_type': 'server_error'}), 500
+    finally:
+        station_lock.release()
 
 
 @main_bp.route('/history/export.csv')
@@ -618,6 +1033,26 @@ def _package_metadata_from_request():
     return meta, payload
 
 
+def _validate_party_fields(meta):
+    """Reject jika nama pengirim/penerima kosong. Return None kalau OK,
+    atau (response, status) tuple kalau invalid."""
+    sender = meta.get('sender') or {}
+    recipient = meta.get('recipient') or {}
+    if not sender.get('nama'):
+        return jsonify({
+            'success': False,
+            'error': 'Nama pengirim wajib diisi untuk resi.',
+            'error_type': 'missing_sender'
+        }), 422
+    if not recipient.get('nama'):
+        return jsonify({
+            'success': False,
+            'error': 'Nama penerima wajib diisi untuk resi.',
+            'error_type': 'missing_recipient'
+        }), 422
+    return None
+
+
 @main_bp.route('/receipt/<package_id>')
 @role_required(ROLE_MITRA)
 def receipt(package_id):
@@ -765,7 +1200,30 @@ def trigger_measurement():
             'success': False,
             'error': 'System is already running a measurement cycle'
         }), 409
-    
+
+    from web import station_lock, camera_lock
+
+    cam_ok, cam_msg, cam_pids = camera_lock.ensure_web_can_use_camera()
+    if not cam_ok:
+        return jsonify({
+            'success': False,
+            'error': cam_msg,
+            'error_type': 'camera_busy_tahap18',
+            'tahap18_pids': cam_pids,
+        }), 409
+
+    user = current_user() or {}
+    ok, st = station_lock.acquire(station_lock.MODE_MITRA,
+                                  owner=user.get('username'))
+    if not ok:
+        return jsonify({
+            'success': False,
+            'error': 'Alat ukur sedang dipakai oleh {} ({}). Tunggu '
+                     'hingga selesai.'.format(st.get('owner') or 'pengguna lain',
+                                              st.get('mode')),
+            'error_type': 'station_busy'
+        }), 409
+
     # Set running flag
     system_status['is_running'] = True
     
@@ -780,6 +1238,17 @@ def trigger_measurement():
         use_file = should_use_file_bridge(HARDWARE_MODE, MEASUREMENT_MODE)
         package_meta, _payload = _package_metadata_from_request()
 
+        # Server-side guard: tolak request tanpa nama pengirim/penerima.
+        # Resi tidak boleh kosong di kolom Pengirim/Penerima.
+        invalid_party = _validate_party_fields(package_meta)
+        if invalid_party is not None:
+            system_status['is_running'] = False
+            try:
+                station_lock.release(owner=user.get('username'))
+            except Exception:
+                pass
+            return invalid_party
+
         if MEASUREMENT_MODE == 'in_process':
             from web.measurement_engine import (
                 measure_real,
@@ -791,6 +1260,14 @@ def trigger_measurement():
 
             try:
                 mapped = measure_real()
+            except camera_lock.CameraBusyError as e:
+                log.warning("Camera busy by tahap18", error=str(e))
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'error_type': 'camera_busy_tahap18',
+                    'tahap18_pids': getattr(e, 'pids', []),
+                }), 409
             except NeedCalibrationError as e:
                 log.warning("Measurement needs calibration", error=str(e))
                 return jsonify({
@@ -1018,6 +1495,7 @@ def trigger_measurement():
         }), 500
     finally:
         system_status['is_running'] = False
+        station_lock.release()
 
 
 @api_bp.route('/manual', methods=['POST'])
@@ -1055,6 +1533,10 @@ def manual_entry():
     service_type, price = classify_package(chargeable)
 
     package_meta, _payload = _package_metadata_from_request()
+
+    invalid_party = _validate_party_fields(package_meta)
+    if invalid_party is not None:
+        return invalid_party
 
     storage = get_storage()
     package_data = {

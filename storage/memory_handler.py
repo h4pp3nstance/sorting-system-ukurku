@@ -74,5 +74,15 @@ class MemoryStorageHandler(IStorageHandler):
         self._packages = {}
         return True
 
+    def update_package_parties(self, package_id, sender=None, recipient=None):
+        pkg = self._packages.get(str(package_id))
+        if not pkg:
+            return False
+        if sender is not None:
+            pkg["sender"] = sender
+        if recipient is not None:
+            pkg["recipient"] = recipient
+        return True
+
     def update_system_status(self, status: str) -> None:
         return None

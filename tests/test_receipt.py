@@ -36,7 +36,10 @@ class TestReceiptRoute:
 
     def _create_package(self, client):
         client.post('/api/reset')
-        response = client.post('/api/measure')
+        response = client.post('/api/measure', json={
+            'sender': {'nama': 'Budi'},
+            'recipient': {'nama': 'Siti'},
+        })
         data = json.loads(response.data)
         assert data['success'] is True
         return data['data']

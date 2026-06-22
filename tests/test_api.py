@@ -84,15 +84,52 @@ class TestWebAPI:
     
     def test_measure_endpoint(self, client):
         """Test POST /api/measure"""
-        response = client.post('/api/measure')
+        response = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['success'] is True
+
+    def test_measure_rejects_missing_sender(self, client):
+        response = client.post('/api/measure', json={
+            'recipient': {'nama': 'Siti'},
+        })
+        assert response.status_code == 422
+        data = json.loads(response.data)
+        assert data['success'] is False
+        assert data['error_type'] == 'missing_sender'
+
+    def test_measure_rejects_missing_recipient(self, client):
+        response = client.post('/api/measure', json={
+            'sender': {'nama': 'Budi'},
+        })
+        assert response.status_code == 422
+        data = json.loads(response.data)
+        assert data['success'] is False
+        assert data['error_type'] == 'missing_recipient'
+
+    def test_measure_rejects_empty_body(self, client):
+        response = client.post('/api/measure')
+        assert response.status_code == 422
+        data = json.loads(response.data)
+        assert data['success'] is False
+        assert data['error_type'] == 'missing_sender'
+
+    def test_measure_persists_sender_and_recipient(self, client):
+        response = client.post('/api/measure', json={
+            'sender': {'nama': 'Budi', 'telepon': '08123', 'alamat': 'Jl A'},
+            'recipient': {'nama': 'Siti', 'telepon': '08456', 'alamat': 'Jl B'},
+        })
+        assert response.status_code == 200
+        package = json.loads(response.data)['data']
+        assert package['sender']['nama'] == 'Budi'
+        assert package['sender']['telepon'] == '08123'
+        assert package['recipient']['nama'] == 'Siti'
+        assert package['recipient']['alamat'] == 'Jl B'
     
     def test_measure_returns_package_data(self, client):
         """Test measure returns complete package data"""
-        response = client.post('/api/measure')
+        response = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         data = json.loads(response.data)
         
         package = data['data']
@@ -105,7 +142,7 @@ class TestWebAPI:
     
     def test_measure_dimensions_structure(self, client):
         """Test dimensions structure"""
-        response = client.post('/api/measure')
+        response = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         data = json.loads(response.data)
         
         dims = data['data']['dimensions']
@@ -120,7 +157,7 @@ class TestWebAPI:
     
     def test_measure_weight_structure(self, client):
         """Test weight structure"""
-        response = client.post('/api/measure')
+        response = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         data = json.loads(response.data)
         
         weight = data['data']['weight']
@@ -133,7 +170,7 @@ class TestWebAPI:
     
     def test_measure_valid_service_type(self, client):
         """Test service type is valid"""
-        response = client.post('/api/measure')
+        response = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         data = json.loads(response.data)
         
         service_type = data['data']['service_type']
@@ -141,7 +178,7 @@ class TestWebAPI:
     
     def test_measure_valid_price(self, client):
         """Test price matches service type"""
-        response = client.post('/api/measure')
+        response = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         data = json.loads(response.data)
         
         service_type = data['data']['service_type']
@@ -159,8 +196,8 @@ class TestWebAPI:
         # Reset first
         client.post('/api/reset')
         
-        response1 = client.post('/api/measure')
-        response2 = client.post('/api/measure')
+        response1 = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
+        response2 = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         
         data1 = json.loads(response1.data)
         data2 = json.loads(response2.data)
@@ -208,7 +245,7 @@ class TestWebAPI:
         """Test history contains measured packages"""
         # Reset and measure
         client.post('/api/reset')
-        client.post('/api/measure')
+        client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         
         response = client.get('/api/history')
         data = json.loads(response.data)
@@ -221,7 +258,7 @@ class TestWebAPI:
         # Create multiple packages
         client.post('/api/reset')
         for _ in range(5):
-            client.post('/api/measure')
+            client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         
         response = client.get('/api/history?limit=3')
         data = json.loads(response.data)
@@ -242,7 +279,7 @@ class TestWebAPI:
     def test_history_single_package(self, client):
         """Test GET /api/history/<id>"""
         client.post('/api/reset')
-        measure_response = client.post('/api/measure')
+        measure_response = client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         pkg_id = json.loads(measure_response.data)['data']['id']
         
         response = client.get(f'/api/history/{pkg_id}')
@@ -301,7 +338,7 @@ class TestWebAPI:
         initial_data = json.loads(initial.data)['data']
         
         # Measure
-        client.post('/api/measure')
+        client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         
         # Get updated stats
         updated = client.get('/api/statistics')
@@ -325,7 +362,7 @@ class TestWebAPI:
         """Test reset clears all history"""
         # Create some packages
         for _ in range(3):
-            client.post('/api/measure')
+            client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         
         # Reset
         client.post('/api/reset')
@@ -341,7 +378,7 @@ class TestWebAPI:
         """Test reset clears statistics"""
         # Create some packages
         for _ in range(3):
-            client.post('/api/measure')
+            client.post('/api/measure', json={'sender': {'nama': 'Budi'}, 'recipient': {'nama': 'Siti'}})
         
         # Reset
         client.post('/api/reset')
@@ -452,6 +489,221 @@ class TestServerSentEvents:
         
         # Without Firebase, should fail gracefully
         assert response.status_code in [200, 400]
+
+
+class TestFormDraftAPI:
+    """Tests for /api/form/draft endpoints (auto-save sender/recipient)."""
+
+    @pytest.fixture(autouse=True)
+    def reset_state(self):
+        routes._storage = routes.InMemoryStorage()
+        from web import mpc_store
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        tmp.close()
+        os.unlink(tmp.name)
+        mpc_store._DATA_PATH = tmp.name
+        mpc_store._loaded[0] = False
+        mpc_store.reset()
+        yield
+        if os.path.exists(tmp.name):
+            os.unlink(tmp.name)
+
+    @pytest.fixture
+    def app(self):
+        app = routes.create_app() if hasattr(routes, 'create_app') else None
+        if app is None:
+            from web import create_app
+            app = create_app()
+        app.config['TESTING'] = True
+        return app
+
+    @pytest.fixture
+    def client(self, app):
+        c = app.test_client()
+        with c.session_transaction() as sess:
+            sess['user'] = {
+                'username': 'mitra_test',
+                'role': 'mitra',
+                'mitra_id': 'MITRA-001',
+                'name': 'Test Mitra',
+            }
+        return c
+
+    def test_save_draft_returns_persisted_payload(self, client):
+        r = client.post('/api/form/draft', json={
+            'sender': {'nama': 'Budi', 'telepon': '081', 'alamat': 'Jl A'},
+            'recipient': {'nama': 'Sari', 'telepon': '082', 'alamat': 'Jl B'},
+        })
+        assert r.status_code == 200
+        body = r.get_json()
+        assert body['success'] is True
+        draft = body['data']['draft']
+        assert draft['sender']['nama'] == 'Budi'
+        assert draft['recipient']['nama'] == 'Sari'
+        assert draft['mitra_id'] == 'MITRA-001'
+
+    def test_get_draft_after_save(self, client):
+        client.post('/api/form/draft', json={
+            'sender': {'nama': 'Budi'},
+            'recipient': {'nama': 'Sari'},
+        })
+        r = client.get('/api/form/draft')
+        assert r.status_code == 200
+        draft = r.get_json()['data']['draft']
+        assert draft['sender']['nama'] == 'Budi'
+
+    def test_get_draft_empty_returns_none(self, client):
+        r = client.get('/api/form/draft')
+        assert r.status_code == 200
+        assert r.get_json()['data']['draft'] is None
+
+    def test_save_empty_clears_draft(self, client):
+        client.post('/api/form/draft', json={
+            'sender': {'nama': 'Budi'},
+        })
+        r = client.post('/api/form/draft', json={
+            'sender': {'nama': '', 'telepon': '', 'alamat': ''},
+            'recipient': {'nama': '', 'telepon': '', 'alamat': ''},
+        })
+        assert r.status_code == 200
+        assert r.get_json()['data']['draft'] is None
+        g = client.get('/api/form/draft')
+        assert g.get_json()['data']['draft'] is None
+
+    def test_delete_clears_draft(self, client):
+        client.post('/api/form/draft', json={'sender': {'nama': 'Budi'}})
+        r = client.delete('/api/form/draft')
+        assert r.status_code == 200
+        assert client.get('/api/form/draft').get_json()['data']['draft'] is None
+
+    def test_draft_scoped_per_mitra(self, app):
+        c1 = app.test_client()
+        with c1.session_transaction() as s:
+            s['user'] = {'username': 'm1', 'role': 'mitra', 'mitra_id': 'MITRA-001'}
+        c2 = app.test_client()
+        with c2.session_transaction() as s:
+            s['user'] = {'username': 'm2', 'role': 'mitra', 'mitra_id': 'MITRA-002'}
+        c1.post('/api/form/draft', json={'sender': {'nama': 'A'}})
+        c2.post('/api/form/draft', json={'sender': {'nama': 'B'}})
+        d1 = c1.get('/api/form/draft').get_json()['data']['draft']
+        d2 = c2.get('/api/form/draft').get_json()['data']['draft']
+        assert d1['sender']['nama'] == 'A'
+        assert d2['sender']['nama'] == 'B'
+
+    def test_non_mitra_user_rejected_on_save(self, app):
+        c = app.test_client()
+        with c.session_transaction() as s:
+            s['user'] = {'username': 'admin', 'role': 'admin'}
+        r = c.post('/api/form/draft', json={'sender': {'nama': 'X'}})
+        assert r.status_code == 403
+        assert r.get_json()['error_type'] == 'not_a_mitra'
+
+
+class TestPackagePartiesPatch:
+    """Tests for PATCH /api/packages/<id>/parties (backfill legacy packages)."""
+
+    @pytest.fixture(autouse=True)
+    def reset_storage(self):
+        routes._storage = routes.InMemoryStorage()
+        yield
+
+    @pytest.fixture
+    def app(self):
+        from web import create_app
+        app = create_app()
+        app.config['TESTING'] = True
+        return app
+
+    @pytest.fixture
+    def client(self, app):
+        c = app.test_client()
+        with c.session_transaction() as s:
+            s['user'] = {
+                'username': 'mitra_test',
+                'role': 'mitra',
+                'mitra_id': 'MITRA-001',
+                'name': 'Test Mitra',
+            }
+        return c
+
+    def _seed_legacy(self, mitra_id='MITRA-001'):
+        pid = routes._storage.save_package({
+            'mitra_id': mitra_id,
+            'mitra_name': 'Mitra A',
+            'dimensions': {'panjang': 10, 'lebar': 10, 'tinggi': 10},
+            'weight': {'aktual': 100, 'volumetrik': 100, 'chargeable': 100,
+                       'source': 'volumetric'},
+            'service_type': 'REGULER',
+            'price': 10000,
+            'data_source': 'box_tahap18',
+        })
+        return pid
+
+    def test_patch_sets_sender_only(self, client):
+        pid = self._seed_legacy()
+        r = client.patch(f'/api/packages/{pid}/parties', json={
+            'sender': {'nama': 'Budi', 'telepon': '081', 'alamat': 'Jl A'},
+        })
+        assert r.status_code == 200
+        body = r.get_json()
+        assert body['success'] is True
+        pkg = body['data']['package']
+        assert pkg['sender']['nama'] == 'Budi'
+        assert 'recipient' not in pkg
+
+    def test_patch_sets_both(self, client):
+        pid = self._seed_legacy()
+        r = client.patch(f'/api/packages/{pid}/parties', json={
+            'sender': {'nama': 'Budi'},
+            'recipient': {'nama': 'Sari'},
+        })
+        assert r.status_code == 200
+        pkg = r.get_json()['data']['package']
+        assert pkg['sender']['nama'] == 'Budi'
+        assert pkg['recipient']['nama'] == 'Sari'
+
+    def test_patch_missing_package_returns_404(self, client):
+        r = client.patch('/api/packages/9999/parties', json={
+            'sender': {'nama': 'Budi'},
+        })
+        assert r.status_code == 404
+        assert r.get_json()['error_type'] == 'not_found'
+
+    def test_patch_empty_payload_rejected(self, client):
+        pid = self._seed_legacy()
+        r = client.patch(f'/api/packages/{pid}/parties', json={})
+        assert r.status_code == 422
+        assert r.get_json()['error_type'] == 'empty_payload'
+
+    def test_patch_blank_sender_name_rejected(self, client):
+        pid = self._seed_legacy()
+        r = client.patch(f'/api/packages/{pid}/parties', json={
+            'sender': {'nama': '', 'telepon': '081', 'alamat': ''},
+        })
+        assert r.status_code == 422
+        assert r.get_json()['error_type'] == 'missing_sender_name'
+
+    def test_patch_blank_recipient_name_rejected(self, client):
+        pid = self._seed_legacy()
+        r = client.patch(f'/api/packages/{pid}/parties', json={
+            'recipient': {'nama': '', 'telepon': '081', 'alamat': ''},
+        })
+        assert r.status_code == 422
+        assert r.get_json()['error_type'] == 'missing_recipient_name'
+
+    def test_patch_other_mitra_package_returns_404(self, app):
+        c1 = app.test_client()
+        with c1.session_transaction() as s:
+            s['user'] = {'username': 'm1', 'role': 'mitra', 'mitra_id': 'MITRA-001'}
+        pid = self._seed_legacy(mitra_id='MITRA-002')
+
+        r = c1.patch(f'/api/packages/{pid}/parties', json={
+            'sender': {'nama': 'Hacker'},
+        })
+        assert r.status_code == 404
+        pkg = routes._storage.get_package(pid)
+        assert pkg.get('sender') is None or pkg.get('sender', {}).get('nama') != 'Hacker'
 
 
 if __name__ == "__main__":

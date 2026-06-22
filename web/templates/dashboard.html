@@ -81,9 +81,12 @@
 
 <!-- Data Paket (Pengirim & Penerima) -->
 <div class="carbon-tile carbon-mb-06">
-    <h2 class="carbon-heading-03 carbon-mb-05">Data Paket</h2>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-04); margin-bottom:var(--space-05);">
+        <h2 class="carbon-heading-03" style="margin:0;">Data Paket</h2>
+        <span id="formDraftStatus" class="carbon-helper-text" style="font-size:0.75rem; color:var(--carbon-text-secondary, #6f6f6f);" aria-live="polite"></span>
+    </div>
     <p class="carbon-helper-text carbon-mb-06" style="margin-top: calc(-1 * var(--space-04));">
-        Lengkapi data pengirim dan penerima sebelum mengambil hasil pengukuran
+        Lengkapi data pengirim dan penerima sebelum mengambil hasil pengukuran (tersimpan otomatis 5 menit)
     </p>
     <div class="carbon-grid carbon-grid--cols-2" style="gap: var(--space-07);">
         <div>
@@ -250,11 +253,14 @@
                 <th data-sort-key="weight">Berat</th>
                 <th data-sort-key="service">Layanan</th>
                 <th data-sort-key="price">Biaya</th>
+                <th>Aksi</th>
             </tr>
         </thead>
         <tbody id="historyTable">
             {% for pkg in history|reverse %}
-            <tr>
+            <tr data-package-id="{{ pkg.id }}"
+                data-has-sender="{{ '1' if (pkg.sender and pkg.sender.nama) else '0' }}"
+                data-has-recipient="{{ '1' if (pkg.recipient and pkg.recipient.nama) else '0' }}">
                 <td data-sort="{{ pkg.id }}"><code>#{{ pkg.id }}</code></td>
                 <td>{{ pkg.timestamp[:19] }}</td>
                 <td>{{ pkg.dimensions.panjang }}×{{ pkg.dimensions.lebar }}×{{ pkg.dimensions.tinggi }} cm</td>
@@ -268,16 +274,76 @@
                     </span>
                 </td>
                 <td>Rp {{ "{:,}".format(pkg.price) }}</td>
+                <td>
+                    {% if not (pkg.sender and pkg.sender.nama) or not (pkg.recipient and pkg.recipient.nama) %}
+                    <button type="button" class="carbon-btn carbon-btn--ghost carbon-btn--sm"
+                            onclick="openCompletePartiesModal('{{ pkg.id }}')">
+                        Lengkapi Data
+                    </button>
+                    {% else %}
+                    <span class="carbon-text-secondary" style="font-size:0.75rem;">—</span>
+                    {% endif %}
+                </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="6" class="carbon-text-center carbon-text-secondary">
+                <td colspan="7" class="carbon-text-center carbon-text-secondary">
                     Belum ada data paket
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<!-- Modal: Lengkapi Data Pengirim/Penerima untuk paket existing (mis. box_tahap18 lama) -->
+<div id="completePartiesModal" class="carbon-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div class="carbon-tile" style="background:#fff; max-width:560px; width:90%; max-height:90vh; overflow-y:auto; padding:var(--space-06);">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-04); margin-bottom:var(--space-05);">
+            <h3 class="carbon-heading-03" style="margin:0;">Lengkapi Data Paket <code id="cpPackageId"></code></h3>
+            <button type="button" onclick="closeCompletePartiesModal()" aria-label="Tutup"
+                    style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+        <p class="carbon-helper-text carbon-mb-05">Isi data pengirim dan/atau penerima yang masih kosong.</p>
+
+        <div class="carbon-grid carbon-grid--cols-2" style="gap:var(--space-06);">
+            <div>
+                <h4 class="carbon-heading-02 carbon-mb-04">Pengirim</h4>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="cp_sender_nama">Nama</label>
+                    <input type="text" id="cp_sender_nama" class="carbon-input">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="cp_sender_telepon">Telepon</label>
+                    <input type="text" id="cp_sender_telepon" class="carbon-input">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="cp_sender_alamat">Alamat</label>
+                    <input type="text" id="cp_sender_alamat" class="carbon-input">
+                </div>
+            </div>
+            <div>
+                <h4 class="carbon-heading-02 carbon-mb-04">Penerima</h4>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="cp_recipient_nama">Nama</label>
+                    <input type="text" id="cp_recipient_nama" class="carbon-input">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="cp_recipient_telepon">Telepon</label>
+                    <input type="text" id="cp_recipient_telepon" class="carbon-input">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="cp_recipient_alamat">Alamat</label>
+                    <input type="text" id="cp_recipient_alamat" class="carbon-input">
+                </div>
+            </div>
+        </div>
+        <div id="cpError" class="carbon-notification carbon-notification--error carbon-mb-04" style="display:none; margin-top:var(--space-05);"></div>
+        <div style="display:flex; gap:var(--space-04); justify-content:flex-end; margin-top:var(--space-06);">
+            <button type="button" class="carbon-btn carbon-btn--ghost" onclick="closeCompletePartiesModal()">Batal</button>
+            <button type="button" class="carbon-btn carbon-btn--primary" id="cpSubmitBtn" onclick="submitCompleteParties()">Simpan</button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -785,6 +851,89 @@
         TableSort.sort('dashHistoryTable', parseInt(col, 10), dir);
     }
 
+    // Form draft auto-save: simpan pengirim/penerima ke /api/form/draft
+    // setiap user ketik (debounce 500ms). Dipakai box_poller saat PB ON ditekan
+    // di alat, supaya paket box_tahap18 punya sender/recipient tanpa modif tahap17/18.
+    const FORM_FIELDS = ['sender_nama','sender_telepon','sender_alamat',
+                         'recipient_nama','recipient_telepon','recipient_alamat'];
+    let formDraftTimer = null;
+    let formDraftAbort = null;
+
+    function setDraftStatus(text, kind) {
+        const el = document.getElementById('formDraftStatus');
+        if (!el) return;
+        el.textContent = text;
+        el.style.color = kind === 'error'
+            ? 'var(--carbon-support-error, #da1e28)'
+            : (kind === 'ok' ? 'var(--carbon-support-success, #198038)' : 'var(--carbon-text-secondary, #6f6f6f)');
+    }
+
+    function readFormDraft() {
+        const get = (id) => (document.getElementById(id)?.value || '').trim();
+        return {
+            sender: { nama: get('sender_nama'), telepon: get('sender_telepon'), alamat: get('sender_alamat') },
+            recipient: { nama: get('recipient_nama'), telepon: get('recipient_telepon'), alamat: get('recipient_alamat') },
+        };
+    }
+
+    async function saveFormDraftNow() {
+        if (formDraftAbort) { try { formDraftAbort.abort(); } catch (e) {} }
+        formDraftAbort = new AbortController();
+        setDraftStatus('Menyimpan…', 'info');
+        try {
+            const r = await fetch('/api/form/draft', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(readFormDraft()),
+                signal: formDraftAbort.signal,
+            });
+            if (!r.ok) throw new Error('http ' + r.status);
+            const body = await r.json();
+            if (body.success) {
+                setDraftStatus(body.data.draft ? 'Tersimpan' : 'Form kosong', 'ok');
+            } else {
+                setDraftStatus('Gagal simpan: ' + (body.error || ''), 'error');
+            }
+        } catch (e) {
+            if (e.name !== 'AbortError') setDraftStatus('Gagal simpan draft', 'error');
+        }
+    }
+
+    function scheduleFormDraftSave() {
+        if (formDraftTimer) clearTimeout(formDraftTimer);
+        setDraftStatus('Mengetik…', 'info');
+        formDraftTimer = setTimeout(saveFormDraftNow, 500);
+    }
+
+    async function restoreFormDraft() {
+        try {
+            const r = await fetch('/api/form/draft');
+            if (!r.ok) return;
+            const body = await r.json();
+            const draft = body?.data?.draft;
+            if (!draft) return;
+            const set = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v || ''; };
+            if (draft.sender) {
+                set('sender_nama', draft.sender.nama);
+                set('sender_telepon', draft.sender.telepon);
+                set('sender_alamat', draft.sender.alamat);
+            }
+            if (draft.recipient) {
+                set('recipient_nama', draft.recipient.nama);
+                set('recipient_telepon', draft.recipient.telepon);
+                set('recipient_alamat', draft.recipient.alamat);
+            }
+            setDraftStatus('Draft dipulihkan', 'ok');
+        } catch (e) { /* silent */ }
+    }
+
+    function attachFormDraftListeners() {
+        FORM_FIELDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', scheduleFormDraftSave);
+        });
+    }
+
     // Initialize real-time updates on page load
     document.addEventListener('DOMContentLoaded', () => {
         refreshHwStatus();
@@ -792,8 +941,105 @@
         TableSort.init('dashHistoryTable');
         refreshBoxStatus();
         setInterval(refreshBoxStatus, 3000);
+        attachFormDraftListeners();
+        restoreFormDraft();
     });
     
+    // Modal Lengkapi Data Pengirim/Penerima untuk paket existing (mis. #512
+    // yang masuk via box_tahap18 sebelum fitur form draft ada).
+    function openCompletePartiesModal(packageId) {
+        const modal = document.getElementById('completePartiesModal');
+        document.getElementById('cpPackageId').textContent = '#' + packageId;
+        modal.dataset.packageId = packageId;
+        modal.style.display = 'flex';
+        ['cp_sender_nama','cp_sender_telepon','cp_sender_alamat',
+         'cp_recipient_nama','cp_recipient_telepon','cp_recipient_alamat']
+            .forEach(id => { document.getElementById(id).value = ''; });
+        const err = document.getElementById('cpError');
+        err.style.display = 'none';
+        err.textContent = '';
+        const row = document.querySelector(`tr[data-package-id="${packageId}"]`);
+        if (row) {
+            if (row.dataset.hasSender === '1') {
+                ['cp_sender_nama','cp_sender_telepon','cp_sender_alamat']
+                    .forEach(id => document.getElementById(id).setAttribute('disabled','disabled'));
+            } else {
+                ['cp_sender_nama','cp_sender_telepon','cp_sender_alamat']
+                    .forEach(id => document.getElementById(id).removeAttribute('disabled'));
+            }
+            if (row.dataset.hasRecipient === '1') {
+                ['cp_recipient_nama','cp_recipient_telepon','cp_recipient_alamat']
+                    .forEach(id => document.getElementById(id).setAttribute('disabled','disabled'));
+            } else {
+                ['cp_recipient_nama','cp_recipient_telepon','cp_recipient_alamat']
+                    .forEach(id => document.getElementById(id).removeAttribute('disabled'));
+            }
+        }
+        document.getElementById('cp_sender_nama').focus();
+    }
+
+    function closeCompletePartiesModal() {
+        document.getElementById('completePartiesModal').style.display = 'none';
+    }
+
+    async function submitCompleteParties() {
+        const modal = document.getElementById('completePartiesModal');
+        const packageId = modal.dataset.packageId;
+        const btn = document.getElementById('cpSubmitBtn');
+        const err = document.getElementById('cpError');
+        err.style.display = 'none';
+        err.textContent = '';
+
+        const get = (id) => (document.getElementById(id)?.value || '').trim();
+        const senderDisabled = document.getElementById('cp_sender_nama').disabled;
+        const recipientDisabled = document.getElementById('cp_recipient_nama').disabled;
+
+        const body = {};
+        if (!senderDisabled) {
+            body.sender = { nama: get('cp_sender_nama'), telepon: get('cp_sender_telepon'), alamat: get('cp_sender_alamat') };
+        }
+        if (!recipientDisabled) {
+            body.recipient = { nama: get('cp_recipient_nama'), telepon: get('cp_recipient_telepon'), alamat: get('cp_recipient_alamat') };
+        }
+        if (!body.sender && !body.recipient) {
+            err.textContent = 'Tidak ada data yang bisa diperbarui.';
+            err.style.display = 'block';
+            return;
+        }
+        if (body.sender && !body.sender.nama) {
+            err.textContent = 'Nama pengirim wajib diisi.';
+            err.style.display = 'block';
+            return;
+        }
+        if (body.recipient && !body.recipient.nama) {
+            err.textContent = 'Nama penerima wajib diisi.';
+            err.style.display = 'block';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Menyimpan…';
+        try {
+            const r = await fetch(`/api/packages/${packageId}/parties`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const data = await r.json();
+            if (!r.ok || !data.success) {
+                throw new Error(data.error || ('HTTP ' + r.status));
+            }
+            closeCompletePartiesModal();
+            location.reload();
+        } catch (e) {
+            err.textContent = 'Gagal: ' + e.message;
+            err.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Simpan';
+        }
+    }
+
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
         if (eventSource) {

@@ -75,7 +75,8 @@ def _ingest_once():
         return
 
     from web.measurement_bridge import map_to_package_format, classify_package
-    from web.routes import get_storage, broadcast_event, system_status
+    from web.routes import (get_storage, broadcast_event, system_status,
+                            is_measurement_claimed)
 
     try:
         mapped = map_to_package_format(raw)
@@ -85,6 +86,16 @@ def _ingest_once():
 
     storage = get_storage()
     if _already_saved(storage, mid):
+        _seen_measurement_id = mid
+        return
+
+    # measurement_id ini sudah dikonsumsi oleh /api/mpc/measure (validasi web
+    # in-process). Skip supaya tidak nambah row "Paket Masuk" duplikat.
+    if is_measurement_claimed(mid):
+        _seen_measurement_id = mid
+        return
+
+    if _handle_mpc_remeasure(storage, mid, mapped, broadcast_event):
         _seen_measurement_id = mid
         return
 
@@ -107,6 +118,21 @@ def _ingest_once():
         "mitra_name": mitra_name,
     }
 
+    # Form draft auto-save dari dashboard: Mitra isi pengirim/penerima sebelum
+    # PB ON, draft di-consume sekali saat paket masuk supaya tidak attach ke
+    # paket Mitra lain. TTL 5 menit; kalau expired/tidak ada -> paket tetap
+    # masuk tanpa sender/recipient (status quo, backward compatible).
+    try:
+        from web import mpc_store
+        draft = mpc_store.consume_form_draft(mitra_id)
+        if draft:
+            if draft.get("sender"):
+                package_data["sender"] = draft["sender"]
+            if draft.get("recipient"):
+                package_data["recipient"] = draft["recipient"]
+    except Exception:
+        pass
+
     package_id = storage.save_package(package_data)
     package = {"id": package_id, "timestamp": mapped["timestamp"], **package_data}
 
@@ -122,6 +148,83 @@ def _ingest_once():
         },
     })
     _seen_measurement_id = mid
+
+
+def _handle_mpc_remeasure(storage, mid, mapped, broadcast_event):
+    """Jika armed state aktif, klaim measurement ini sebagai pengukuran MPC.
+
+    Return True kalau measurement berhasil di-handle sebagai re-measure (caller
+    SKIP save_package). Return False kalau tidak ada armed atau gagal -- caller
+    lanjut alur normal save_package.
+    """
+    from web import mpc_store
+    arm = mpc_store.get_armed()
+    if not arm:
+        return False
+
+    consumed = mpc_store.consume_armed(mid, expected_package_id=arm.get("package_id"))
+    if not consumed:
+        return False
+
+    package_id = consumed.get("package_id")
+    try:
+        original = storage.get_package(package_id)
+    except Exception:
+        original = None
+    if not original:
+        broadcast_event("mpc_arm_failed", {
+            "package_id": package_id,
+            "reason": "package_not_found",
+            "measurement_id": mid,
+        })
+        return True
+
+    from web.validation_engine import (
+        compare_measurements, extract_measurement,
+    )
+    from web.settings_store import get_tolerances
+    from web.routes import _send_validation_notification
+
+    mitra_meas = extract_measurement(original)
+    mpc_meas = {
+        "panjang": mapped.get("panjang"),
+        "lebar": mapped.get("lebar"),
+        "tinggi": mapped.get("tinggi"),
+        "berat_aktual": mapped.get("berat_aktual"),
+        "berat_volumetrik": mapped.get("berat_volumetrik"),
+        "chargeable_weight": mapped.get("chargeable_weight"),
+    }
+
+    tolerances = get_tolerances()
+    result = compare_measurements(mitra_meas, mpc_meas, tolerances,
+                                  normalize_orientation=True)
+
+    attempt = mpc_store.add_validation_attempt(
+        package_id=package_id,
+        mpc_measurement=mpc_meas,
+        result=result,
+        mpc_username=consumed.get("armed_by"),
+        catatan="Auto-validasi via PB ON (re-measure tahap18)",
+        data_source="mpc_pb_remeasure",
+        mitra_snapshot=mitra_meas,
+        sensor_status="ok",
+    )
+
+    _send_validation_notification(
+        package_id=package_id,
+        to_mitra_id=original.get("mitra_id"),
+        result=result,
+        source_label="PB ON alat",
+    )
+
+    broadcast_event("mpc_validated", {
+        "package_id": package_id,
+        "measurement_id": mid,
+        "result": result,
+        "attempt": attempt,
+        "armed_by": consumed.get("armed_by"),
+    })
+    return True
 
 
 def _loop():

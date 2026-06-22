@@ -41,3 +41,14 @@ class IStorageHandler(ABC):
     def get_statistics(self) -> Dict:
         """Get current statistics."""
         pass
+
+    def update_package_parties(self, package_id: str,
+                               sender: Optional[Dict] = None,
+                               recipient: Optional[Dict] = None) -> bool:
+        """Update sender/recipient blok pada paket existing.
+
+        Default no-op + return False supaya backend tanpa override aman.
+        Dipakai endpoint backfill paket lama yang masuk lewat box_tahap18
+        sebelum fitur form draft ada.
+        """
+        return False

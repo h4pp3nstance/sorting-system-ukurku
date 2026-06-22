@@ -141,6 +141,34 @@ class SQLiteHandler(IStorageHandler):
             conn.close()
         return [self._row_to_package(r) for r in rows]
 
+    def update_package_parties(self, package_id, sender=None, recipient=None):
+        """Backfill sender/recipient untuk paket existing (mis. paket box_tahap18 lama).
+
+        Hanya update field yang non-None; field None dibiarkan apa adanya.
+        Return True kalau paket ditemukan & data_json berhasil ditulis ulang.
+        """
+        conn = self._connect_raw()
+        try:
+            row = conn.execute(
+                "SELECT data_json FROM packages WHERE id = ?",
+                (str(package_id),),
+            ).fetchone()
+            if not row:
+                return False
+            data = json.loads(row["data_json"]) if row["data_json"] else {}
+            if sender is not None:
+                data["sender"] = sender
+            if recipient is not None:
+                data["recipient"] = recipient
+            conn.execute(
+                "UPDATE packages SET data_json = ? WHERE id = ?",
+                (json.dumps(data, ensure_ascii=False), str(package_id)),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return True
+
     def update_statistics(self, package_data: Dict) -> bool:
         # Statistik dihitung on-the-fly di get_statistics (hindari dual-write).
         return True
