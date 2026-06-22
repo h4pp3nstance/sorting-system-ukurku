@@ -163,3 +163,134 @@ class TestPersistence:
     def test_data_file_created(self):
         store.create_notification("A", "M", "t", "m")
         assert os.path.exists(self._path)
+
+
+class TestFormDraft:
+    def setup_method(self):
+        self._path = _use_temp_store()
+
+    def teardown_method(self):
+        if os.path.exists(self._path):
+            os.unlink(self._path)
+
+    def _party(self, nama="Budi", telepon="08123", alamat="Jl Mawar"):
+        return {"nama": nama, "telepon": telepon, "alamat": alamat}
+
+    def test_set_and_get_draft(self):
+        draft = store.set_form_draft(
+            "MITRA-001",
+            sender=self._party("Budi"),
+            recipient=self._party("Sari"),
+        )
+        assert draft is not None
+        assert draft["sender"]["nama"] == "Budi"
+        assert draft["recipient"]["nama"] == "Sari"
+        got = store.get_form_draft("MITRA-001")
+        assert got is not None
+        assert got["sender"]["nama"] == "Budi"
+
+    def test_set_draft_scoped_per_mitra(self):
+        store.set_form_draft("MITRA-001", sender=self._party("A"))
+        store.set_form_draft("MITRA-002", sender=self._party("B"))
+        a = store.get_form_draft("MITRA-001")
+        b = store.get_form_draft("MITRA-002")
+        assert a["sender"]["nama"] == "A"
+        assert b["sender"]["nama"] == "B"
+
+    def test_set_empty_payload_clears_draft(self):
+        store.set_form_draft("MITRA-001", sender=self._party("Budi"))
+        store.set_form_draft("MITRA-001", sender=None, recipient=None)
+        assert store.get_form_draft("MITRA-001") is None
+
+    def test_set_blank_strings_treated_as_none(self):
+        empty = {"nama": "  ", "telepon": "", "alamat": ""}
+        result = store.set_form_draft(
+            "MITRA-001",
+            sender=empty,
+            recipient=empty,
+        )
+        assert result is None
+        assert store.get_form_draft("MITRA-001") is None
+
+    def test_set_strips_whitespace(self):
+        store.set_form_draft(
+            "MITRA-001",
+            sender={"nama": "  Budi  ", "telepon": " 08123 ", "alamat": ""},
+        )
+        draft = store.get_form_draft("MITRA-001")
+        assert draft["sender"]["nama"] == "Budi"
+        assert draft["sender"]["telepon"] == "08123"
+        assert draft["sender"]["alamat"] == ""
+
+    def test_consume_returns_and_clears(self):
+        store.set_form_draft(
+            "MITRA-001",
+            sender=self._party("Budi"),
+            recipient=self._party("Sari"),
+        )
+        consumed = store.consume_form_draft("MITRA-001")
+        assert consumed is not None
+        assert consumed["sender"]["nama"] == "Budi"
+        assert consumed["recipient"]["nama"] == "Sari"
+        assert store.get_form_draft("MITRA-001") is None
+
+    def test_consume_missing_returns_none(self):
+        assert store.consume_form_draft("MITRA-001") is None
+
+    def test_consume_does_not_affect_other_mitra(self):
+        store.set_form_draft("MITRA-001", sender=self._party("A"))
+        store.set_form_draft("MITRA-002", sender=self._party("B"))
+        store.consume_form_draft("MITRA-001")
+        assert store.get_form_draft("MITRA-001") is None
+        b = store.get_form_draft("MITRA-002")
+        assert b is not None and b["sender"]["nama"] == "B"
+
+    def test_clear_form_draft(self):
+        store.set_form_draft("MITRA-001", sender=self._party("Budi"))
+        removed = store.clear_form_draft("MITRA-001")
+        assert removed is not None
+        assert store.get_form_draft("MITRA-001") is None
+
+    def test_expired_draft_auto_cleared_on_get(self):
+        store.set_form_draft(
+            "MITRA-001",
+            sender=self._party("Budi"),
+            ttl_seconds=1,
+        )
+        import time
+        time.sleep(1.1)
+        assert store.get_form_draft("MITRA-001") is None
+
+    def test_expired_draft_not_consumed(self):
+        store.set_form_draft(
+            "MITRA-001",
+            sender=self._party("Budi"),
+            ttl_seconds=1,
+        )
+        import time
+        time.sleep(1.1)
+        assert store.consume_form_draft("MITRA-001") is None
+
+    def test_draft_survives_reload(self):
+        store.set_form_draft(
+            "MITRA-001",
+            sender=self._party("Budi"),
+            recipient=self._party("Sari"),
+        )
+        store._loaded[0] = False
+        store._form_drafts.clear()
+        got = store.get_form_draft("MITRA-001")
+        assert got is not None
+        assert got["sender"]["nama"] == "Budi"
+        assert got["recipient"]["nama"] == "Sari"
+
+    def test_none_mitra_id_safe(self):
+        assert store.set_form_draft(None, sender=self._party("X")) is None
+        assert store.get_form_draft(None) is None
+        assert store.consume_form_draft(None) is None
+        assert store.clear_form_draft(None) is None
+
+    def test_reset_clears_drafts(self):
+        store.set_form_draft("MITRA-001", sender=self._party("Budi"))
+        store.reset()
+        assert store.get_form_draft("MITRA-001") is None
