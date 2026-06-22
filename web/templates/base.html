@@ -730,7 +730,12 @@
         const API = {
             async get(endpoint) {
                 const response = await fetch(`/api${endpoint}`);
-                return response.json();
+                const text = await response.text();
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return { success: false, error: 'Server error (' + response.status + ')', error_type: 'server_error' };
+                }
             },
             
             async post(endpoint, data = {}) {
@@ -739,7 +744,12 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                return response.json();
+                const text = await response.text();
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return { success: false, error: 'Server error (' + response.status + '). Coba lagi.', error_type: 'server_error' };
+                }
             }
         };
         
