@@ -43,6 +43,29 @@
     </div>
 </div>
 
+<!-- Status Alat Ukur -->
+<div id="stationStatus" class="carbon-notification carbon-notification--info carbon-mt-06">
+    <div>Memeriksa status alat ukur...</div>
+</div>
+
+<div id="armedBanner" class="carbon-notification carbon-notification--info carbon-mt-06"
+     style="display: none;">
+    <div class="carbon-flex carbon-flex--between" style="gap:1rem; align-items: center;">
+        <div>
+            <strong>Menunggu pengukuran MPC untuk paket
+                <code id="armedPackageId">#-</code></strong>
+            <div class="carbon-text-secondary">
+                Taruh paket di alat dan tekan <strong>PB ON</strong>.
+                Sisa waktu: <span id="armedCountdown">-</span>
+            </div>
+        </div>
+        <button type="button" id="btnCancelArm"
+                class="carbon-btn carbon-btn--danger carbon-btn--sm">
+            Batal
+        </button>
+    </div>
+</div>
+
 <!-- Paket Masuk -->
 <div class="carbon-mt-07">
     <h2 class="carbon-heading-03 carbon-mb-05">Paket Masuk</h2>
@@ -53,34 +76,59 @@
                 <th>Mitra</th>
                 <th>Dimensi (Mitra)</th>
                 <th>Tagihan (Mitra)</th>
-                <th>Status Validasi</th>
+                <th>Hasil Validasi MPC</th>
                 <th>Aksi</th>
             </tr>
         </thead>
         <tbody>
             {% for pkg in packages %}
+            {% set v = validations.get(pkg.id|string) %}
+            {% set pkg_attempts = attempts_by_pkg.get(pkg.id|string, []) %}
             <tr>
                 <td><code>#{{ pkg.id }}</code></td>
                 <td>{{ pkg.mitra_name or pkg.mitra_id or '-' }}</td>
                 <td>{{ pkg.dimensions.panjang }}×{{ pkg.dimensions.lebar }}×{{ pkg.dimensions.tinggi }} cm</td>
                 <td>{{ pkg.weight.chargeable }}g</td>
                 <td>
-                    {% set v = validations.get(pkg.id|string) %}
                     {% if v %}
-                    <span class="carbon-tag
-                        {% if v.status == 'valid' %}carbon-tag--green
-                        {% elif v.status == 'perlu_review' %}carbon-tag--yellow
-                        {% else %}carbon-tag--red{% endif %}">
-                        {{ v.status_label }}
-                    </span>
+                    <div class="carbon-flex" style="gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                        <span class="carbon-tag
+                            {% if v.status == 'valid' %}carbon-tag--green
+                            {% elif v.status == 'perlu_review' %}carbon-tag--yellow
+                            {% else %}carbon-tag--red{% endif %}">
+                            {{ v.status_label }}
+                        </span>
+                        {% if pkg_attempts %}
+                        <span class="carbon-text-secondary" style="font-size:0.8125rem;">
+                            ({{ pkg_attempts|length }}× ukur)
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% if v.mpc_measurement %}
+                    <div class="carbon-text-secondary" style="font-size:0.8125rem; margin-top:0.25rem;">
+                        MPC: {{ v.mpc_measurement.panjang }}×{{ v.mpc_measurement.lebar }}×{{ v.mpc_measurement.tinggi }} cm,
+                        {{ v.mpc_measurement.chargeable_weight }}g
+                    </div>
+                    {% endif %}
+                    {% if v.selisih %}
+                    {% set has_diff = false %}
+                    {% for k, val in v.selisih.items() %}
+                        {% if val and val|abs > 0.05 %}{% set has_diff = true %}{% endif %}
+                    {% endfor %}
+                    {% if v.breaches %}
+                    <div class="carbon-text-secondary" style="font-size:0.8125rem;">
+                        Selisih: {% for b in v.breaches %}{{ b }}{% if not loop.last %}, {% endif %}{% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endif %}
                     {% else %}
                     <span class="carbon-tag carbon-tag--gray">Belum Divalidasi</span>
                     {% endif %}
                 </td>
                 <td>
                     <a href="{{ url_for('main.mpc_validate_page', package_id=pkg.id) }}"
-                       class="carbon-btn carbon-btn--tertiary carbon-btn--sm">
-                        {% if validations.get(pkg.id|string) %}Lihat / Ulang{% else %}Validasi{% endif %}
+                       class="carbon-btn carbon-btn--primary carbon-btn--sm">
+                        {% if v %}Ukur Ulang{% else %}Validasi{% endif %}
                     </a>
                 </td>
             </tr>
@@ -139,4 +187,110 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const MODE_LABEL = {
+        mitra_measuring: 'Pengukuran Mitra',
+        mpc_measuring: 'Validasi MPC',
+        idle: 'Idle'
+    };
+
+    async function refreshStationStatus() {
+        const box = document.getElementById('stationStatus');
+        try {
+            const res = await fetch('/api/station/status');
+            const json = await res.json();
+            const data = (json && json.data) ? json.data : {};
+            if (data.tahap18_active) {
+                box.className = 'carbon-notification carbon-notification--warning carbon-mt-06';
+                box.innerHTML = '<div><strong>Alat sedang dipakai pengukuran fisik (PB ON di alat).</strong> ' +
+                                'Tunggu sampai operator tekan PB OFF sebelum mengukur dari web.</div>';
+            } else if (data.busy) {
+                box.className = 'carbon-notification carbon-notification--warning carbon-mt-06';
+                box.innerHTML = '<div>Alat ukur sedang dipakai (mode: ' +
+                                (MODE_LABEL[data.mode] || data.mode || '-') +
+                                ') oleh ' + (data.owner || '-') + '</div>';
+            } else {
+                box.className = 'carbon-notification carbon-notification--success carbon-mt-06';
+                box.innerHTML = '<div>Alat ukur siap</div>';
+            }
+        } catch (e) {
+            box.className = 'carbon-notification carbon-notification--error carbon-mt-06';
+            box.innerHTML = '<div>Gagal memeriksa status alat ukur.</div>';
+        }
+    }
+
+    refreshStationStatus();
+    setInterval(refreshStationStatus, 5000);
+
+    // --- Armed (Ukur Ulang) ---
+    const armedBanner = document.getElementById('armedBanner');
+    const armedPackageIdEl = document.getElementById('armedPackageId');
+    const armedCountdownEl = document.getElementById('armedCountdown');
+    const btnCancelArm = document.getElementById('btnCancelArm');
+    let armedExpiresAt = null;
+    let countdownTimer = null;
+
+    function fmtRemaining(ms) {
+        if (ms <= 0) return '00:00';
+        const s = Math.floor(ms / 1000);
+        const mm = String(Math.floor(s / 60)).padStart(2, '0');
+        const ss = String(s % 60).padStart(2, '0');
+        return mm + ':' + ss;
+    }
+
+    function showArmed(arm) {
+        if (!arm) {
+            armedBanner.style.display = 'none';
+            armedExpiresAt = null;
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+            return;
+        }
+        armedBanner.style.display = '';
+        armedPackageIdEl.textContent = '#' + arm.package_id;
+        armedExpiresAt = arm.expires_at ? new Date(arm.expires_at).getTime() : null;
+        if (countdownTimer) clearInterval(countdownTimer);
+        const tick = () => {
+            if (!armedExpiresAt) { armedCountdownEl.textContent = '-'; return; }
+            const remaining = armedExpiresAt - Date.now();
+            armedCountdownEl.textContent = fmtRemaining(remaining);
+            if (remaining <= 0) { showArmed(null); }
+        };
+        tick();
+        countdownTimer = setInterval(tick, 1000);
+    }
+
+    async function refreshArmed() {
+        try {
+            const res = await fetch('/api/mpc/arm');
+            const json = await res.json();
+            showArmed((json && json.data) ? json.data.armed : null);
+        } catch (e) { /* ignore */ }
+    }
+
+    if (btnCancelArm) {
+        btnCancelArm.addEventListener('click', async () => {
+            try {
+                await fetch('/api/mpc/arm/cancel', { method: 'POST' });
+            } catch (e) { /* ignore */ }
+            showArmed(null);
+        });
+    }
+
+    refreshArmed();
+    setInterval(refreshArmed, 7000);
+
+    // --- SSE: auto-reload saat validasi selesai ---
+    try {
+        const es = new EventSource('/api/events');
+        es.addEventListener('mpc_validated', () => { window.location.reload(); });
+        es.addEventListener('mpc_armed', (ev) => {
+            try { showArmed(JSON.parse(ev.data).armed); } catch (e) {}
+        });
+        es.addEventListener('mpc_arm_cancelled', () => { showArmed(null); });
+        es.addEventListener('mpc_arm_failed', () => { showArmed(null); refreshStationStatus(); });
+    } catch (e) { /* SSE optional */ }
+</script>
 {% endblock %}

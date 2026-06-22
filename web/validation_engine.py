@@ -41,7 +41,43 @@ def _selisih(mitra, mpc, key):
     return abs(_to_float(mitra.get(key)) - _to_float(mpc.get(key)))
 
 
-def compare_measurements(mitra, mpc, tolerances):
+def normalize_dimensions(measurement):
+    """Return copy of measurement dengan panjang/lebar/tinggi di-sort menurun.
+
+    Orientasi berbeda (P/L/T tertukar) akan menghasilkan representasi yang sama
+    sehingga perbandingan tidak memicu false breach karena orientasi.
+    Field lain (berat_aktual, berat_volumetrik, chargeable_weight) tidak diubah.
+    """
+    m = dict(measurement) if measurement else {}
+    dims = sorted(
+        [_to_float(m.get("panjang")), _to_float(m.get("lebar")), _to_float(m.get("tinggi"))],
+        reverse=True,
+    )
+    m["panjang"] = dims[0]
+    m["lebar"] = dims[1]
+    m["tinggi"] = dims[2]
+    return m
+
+
+def is_package_present(measurement, min_weight_g=10.0, min_dim_cm=0.5):
+    """Deteksi apakah ada paket di alat ukur.
+
+    Return False jika:
+    - berat_aktual < min_weight_g, ATAU
+    - salah satu dimensi (panjang/lebar/tinggi) < min_dim_cm.
+
+    Berguna untuk mendeteksi "alat kosong / paket tidak terdeteksi".
+    """
+    m = measurement or {}
+    if _to_float(m.get("berat_aktual")) < min_weight_g:
+        return False
+    for key, _ in _DIMENSION_FIELDS:
+        if _to_float(m.get(key)) < min_dim_cm:
+            return False
+    return True
+
+
+def compare_measurements(mitra, mpc, tolerances, normalize_orientation=False):
     """Bandingkan dua pengukuran dan tentukan status validasi.
 
     Args:
@@ -49,12 +85,18 @@ def compare_measurements(mitra, mpc, tolerances):
                berat_aktual, berat_volumetrik, chargeable_weight).
         mpc: dict pengukuran MPC (key sama).
         tolerances: dict {dimensi_cm, berat_aktual_g, berat_tagihan_g}.
+        normalize_orientation: jika True, sort dimensi P/L/T menurun pada
+            kedua sisi sebelum membandingkan sehingga orientasi berbeda
+            tidak memicu false breach. Default False (perilaku lama).
 
     Returns:
         dict {status, status_label, selisih: {...}, breaches: [...]}.
     """
     mitra = mitra or {}
     mpc = mpc or {}
+    if normalize_orientation:
+        mitra = normalize_dimensions(mitra)
+        mpc = normalize_dimensions(mpc)
     tolerances = tolerances or {}
 
     tol_dim = _to_float(tolerances.get("dimensi_cm", 1.0))

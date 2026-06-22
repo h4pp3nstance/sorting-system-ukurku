@@ -49,44 +49,166 @@
         </div>
     </div>
 
-    <!-- Ukur Ulang MPC -->
+    <!-- Ukur Ulang (Mode MPC) -->
     <div class="carbon-tile">
-        <h2 class="carbon-heading-03 carbon-mb-05">Ukur Ulang MPC</h2>
-        <div class="form-group">
-            <label class="carbon-label-01" for="m_panjang">Panjang (cm)</label>
-            <input class="carbon-input" type="number" step="0.1" id="m_panjang"
-                   value="{{ existing.mpc_measurement.panjang if existing else '' }}">
+        <h2 class="carbon-heading-03 carbon-mb-05">Ukur Ulang (Mode MPC)</h2>
+
+        <!-- Live Preview Kamera -->
+        <div class="carbon-flex carbon-flex--between carbon-mb-05">
+            <span class="carbon-label-01">Preview Kamera</span>
+            <button id="previewBtn" type="button"
+                    class="carbon-btn carbon-btn--tertiary carbon-btn--sm"
+                    onclick="togglePreview()">Hentikan Preview</button>
         </div>
-        <div class="form-group">
-            <label class="carbon-label-01" for="m_lebar">Lebar (cm)</label>
-            <input class="carbon-input" type="number" step="0.1" id="m_lebar"
-                   value="{{ existing.mpc_measurement.lebar if existing else '' }}">
+        <div style="background:#161616;border-radius:4px;overflow:hidden;
+                    display:flex;align-items:center;justify-content:center;
+                    width:100%;margin:0 auto var(--space-05);aspect-ratio:4/3;max-height:300px;">
+            <img id="cameraPreview" alt="Preview kamera"
+                 style="width:100%;height:100%;object-fit:contain;display:none;">
+            <span id="previewPlaceholder" class="carbon-text-secondary"
+                  style="padding:var(--space-06);">Menghubungkan ke kamera...</span>
         </div>
-        <div class="form-group">
-            <label class="carbon-label-01" for="m_tinggi">Tinggi (cm)</label>
-            <input class="carbon-input" type="number" step="0.1" id="m_tinggi"
-                   value="{{ existing.mpc_measurement.tinggi if existing else '' }}">
+
+        <div class="carbon-notification carbon-notification--info">
+            <div>
+                <strong>Langkah pengukuran:</strong>
+                <ol style="margin: var(--space-03) 0 0 1.25rem;">
+                    <li>Letakkan paket <code>#{{ package.id }}</code> di alat ukur.</li>
+                    <li>Pastikan alat ukur siap (tidak sedang dipakai).</li>
+                    <li>Klik tombol <strong>Ukur Paket (Mode MPC)</strong> di bawah.</li>
+                </ol>
+                <p class="carbon-text-secondary carbon-mt-05" style="margin-bottom:0;">
+                    Acuan data Mitra: {{ mitra_measurement.panjang }}&times;{{ mitra_measurement.lebar }}&times;{{ mitra_measurement.tinggi }} cm,
+                    berat {{ mitra_measurement.berat_aktual }} g (lihat panel kiri untuk detail).
+                </p>
+            </div>
         </div>
+
         <div class="form-group">
-            <label class="carbon-label-01" for="m_berat">Berat Aktual (g)</label>
-            <input class="carbon-input" type="number" step="1" id="m_berat"
-                   value="{{ existing.mpc_measurement.berat_aktual if existing else '' }}">
-        </div>
-        <div class="form-group">
-            <label class="carbon-label-01" for="m_catatan">Catatan (opsional)</label>
+            <label class="carbon-label-01" for="m_catatan">Catatan operator (opsional)</label>
             <input class="carbon-input" type="text" id="m_catatan"
                    value="{{ existing.catatan if existing else '' }}">
         </div>
-        <button class="carbon-btn carbon-btn--primary carbon-mt-05" onclick="submitValidation()">
-            Bandingkan & Simpan
+
+        <div id="stationStatus" class="carbon-notification carbon-notification--info carbon-mt-05">
+            <div>Memeriksa status alat ukur...</div>
+        </div>
+
+        <button class="carbon-btn carbon-btn--primary carbon-mt-05" id="btnUkur" onclick="ukurPaketMPC()">
+            Ukur Paket (Mode MPC)
         </button>
+
+        <div id="ukurProgress" class="carbon-notification carbon-notification--info carbon-mt-05" style="display:none;">
+            <div>
+                <span class="carbon-loading carbon-loading--small"></span>
+                <span style="margin-left: var(--space-03);">Sedang mengukur paket lewat sensor, mohon tunggu...</span>
+            </div>
+        </div>
+
+        <!-- Fallback manual: hanya dipakai jika sensor gagal -->
+        <details class="carbon-mt-06">
+            <summary class="carbon-label-01" style="cursor:pointer;">Input manual (jika sensor gagal)</summary>
+            <div class="carbon-mt-05">
+                <div class="form-group">
+                    <label class="carbon-label-01" for="m_panjang">Panjang (cm)</label>
+                    <input class="carbon-input" type="number" step="0.1" id="m_panjang"
+                           value="{{ existing.mpc_measurement.panjang if existing else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="m_lebar">Lebar (cm)</label>
+                    <input class="carbon-input" type="number" step="0.1" id="m_lebar"
+                           value="{{ existing.mpc_measurement.lebar if existing else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="m_tinggi">Tinggi (cm)</label>
+                    <input class="carbon-input" type="number" step="0.1" id="m_tinggi"
+                           value="{{ existing.mpc_measurement.tinggi if existing else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="carbon-label-01" for="m_berat">Berat Aktual (g)</label>
+                    <input class="carbon-input" type="number" step="1" id="m_berat"
+                           value="{{ existing.mpc_measurement.berat_aktual if existing else '' }}">
+                </div>
+                <button class="carbon-btn carbon-btn--tertiary carbon-mt-05" onclick="submitValidation()">
+                    Bandingkan & Simpan
+                </button>
+            </div>
+        </details>
     </div>
+</div>
+
+<!-- Riwayat Validasi Paket Ini -->
+<div class="carbon-mt-07">
+    <h2 class="carbon-heading-03 carbon-mb-05">Riwayat Validasi Paket Ini</h2>
+    <table class="carbon-table">
+        <thead>
+            <tr>
+                <th>Percobaan</th>
+                <th>Status</th>
+                <th>Sumber Data</th>
+                <th>Operator MPC</th>
+                <th>Waktu</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in attempts %}
+            <tr>
+                <td>Percobaan ke-{{ a.attempt_no }}</td>
+                <td>
+                    <span class="carbon-tag
+                        {% if a.status == 'valid' %}carbon-tag--green
+                        {% elif a.status == 'perlu_review' %}carbon-tag--yellow
+                        {% else %}carbon-tag--red{% endif %}">
+                        {{ a.status_label }}
+                    </span>
+                </td>
+                <td>
+                    {% if a.data_source == 'mpc_in_process' %}Sensor (Mode MPC)
+                    {% elif a.data_source == 'manual' %}Input manual
+                    {% else %}{{ a.data_source or '-' }}{% endif %}
+                </td>
+                <td>{{ a.mpc_username or '-' }}</td>
+                <td>{{ a.validated_at[:19] if a.validated_at else '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="carbon-text-secondary">Belum ada percobaan validasi.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     const PACKAGE_ID = "{{ package.id }}";
+
+    let previewOn = false;
+    function setPreview(on) {
+        const img = document.getElementById('cameraPreview');
+        const ph = document.getElementById('previewPlaceholder');
+        const btn = document.getElementById('previewBtn');
+        previewOn = on;
+        if (on) {
+            img.onerror = () => {
+                setPreview(false);
+                ph.textContent = 'Kamera tidak tersedia (mungkin sedang dipakai proses lain).';
+            };
+            img.src = "{{ url_for('preview.video_feed') }}?t=" + Date.now();
+            img.style.display = 'block';
+            ph.style.display = 'none';
+            btn.textContent = 'Hentikan Preview';
+        } else {
+            img.onerror = null;
+            img.src = "";
+            img.style.display = 'none';
+            ph.style.display = 'flex';
+            if (ph.textContent.trim() === '') ph.textContent = 'Preview nonaktif';
+            btn.textContent = 'Mulai Preview';
+        }
+    }
+    function togglePreview() {
+        setPreview(!previewOn);
+    }
 
     function tagClass(status) {
         if (status === 'valid') return 'carbon-tag--green';
@@ -98,6 +220,90 @@
         if (status === 'valid') return 'carbon-notification--success';
         if (status === 'perlu_review') return 'carbon-notification--warning';
         return 'carbon-notification--error';
+    }
+
+    function renderHasil(d) {
+        const bar = document.getElementById('resultBar');
+        let rows = '';
+        for (const k in d.selisih) {
+            const breached = d.breaches.includes(k);
+            rows += '<tr><td>' + k + '</td><td>' + d.selisih[k] +
+                    '</td><td>' + (breached ? 'lewat toleransi' : 'ok') + '</td></tr>';
+        }
+
+        let attemptInfo = '';
+        if (d.attempt_no) {
+            attemptInfo = '<p class="carbon-text-secondary carbon-mt-05" style="margin-bottom:0;">Percobaan ke-' +
+                          d.attempt_no + '</p>';
+        }
+
+        let sensorInfo = '';
+        if (d.mpc_measurement) {
+            const m = d.mpc_measurement;
+            sensorInfo =
+                '<div class="carbon-heading-04 carbon-mt-06">Hasil Sensor (read-only)</div>' +
+                '<table class="carbon-table carbon-mt-05"><tbody>' +
+                '<tr><td>Panjang</td><td>' + (m.panjang ?? '-') + ' cm</td></tr>' +
+                '<tr><td>Lebar</td><td>' + (m.lebar ?? '-') + ' cm</td></tr>' +
+                '<tr><td>Tinggi</td><td>' + (m.tinggi ?? '-') + ' cm</td></tr>' +
+                '<tr><td>Berat Aktual</td><td>' + (m.berat_aktual ?? '-') + ' g</td></tr>' +
+                '</tbody></table>';
+        }
+
+        bar.className = 'carbon-notification ' + notifClass(d.status) + ' carbon-mt-06';
+        bar.innerHTML =
+            '<div style="width:100%;">' +
+            '<div class="carbon-heading-02">Hasil: <span class="carbon-tag ' +
+            tagClass(d.status) + '">' + d.status_label + '</span></div>' +
+            attemptInfo +
+            '<table class="carbon-table carbon-mt-05"><thead><tr><th>Field</th>' +
+            '<th>Selisih</th><th>Keterangan</th></tr></thead><tbody>' + rows +
+            '</tbody></table>' + sensorInfo + '</div>';
+    }
+
+    function errorMpcMessage(res) {
+        const messages = {
+            station_busy: 'Alat ukur sedang dipakai operator lain. Tunggu sampai selesai lalu coba lagi.',
+            needs_remeasure: 'Paket tidak terdeteksi di alat ukur. Periksa posisi paket lalu ukur ulang.',
+            need_calibration: 'Alat ukur perlu dikalibrasi terlebih dahulu sebelum digunakan.',
+            sensor_error: 'Terjadi gangguan pada sensor alat ukur. Coba lagi, atau gunakan input manual.',
+            camera_busy_tahap18: 'Alat sedang dipakai pengukuran fisik (PB ON di alat). Tunggu PB OFF lalu coba lagi.'
+        };
+        if (res.error_type && messages[res.error_type]) {
+            return messages[res.error_type];
+        }
+        return res.error || 'Gagal mengukur paket.';
+    }
+
+    async function ukurPaketMPC() {
+        const btn = document.getElementById('btnUkur');
+        const progress = document.getElementById('ukurProgress');
+        const bar = document.getElementById('resultBar');
+        const originalText = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = 'Mengukur...';
+        progress.style.display = 'flex';
+
+        try {
+            const res = await API.post('/mpc/measure', {
+                package_id: PACKAGE_ID,
+                catatan: document.getElementById('m_catatan').value
+            });
+            if (!res.success) {
+                bar.className = 'carbon-notification carbon-notification--error carbon-mt-06';
+                bar.innerHTML = '<div><strong>Error:</strong> ' + errorMpcMessage(res) + '</div>';
+                return;
+            }
+            renderHasil(res.data);
+        } catch (e) {
+            bar.className = 'carbon-notification carbon-notification--error carbon-mt-06';
+            bar.innerHTML = '<div><strong>Error:</strong> ' + e.message + '</div>';
+        } finally {
+            progress.style.display = 'none';
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
     }
 
     async function submitValidation() {
@@ -118,25 +324,56 @@
                 bar.innerHTML = '<div><strong>Error:</strong> ' + (res.error || 'Gagal') + '</div>';
                 return;
             }
-            const d = res.data;
-            let rows = '';
-            for (const k in d.selisih) {
-                const breached = d.breaches.includes(k);
-                rows += '<tr><td>' + k + '</td><td>' + d.selisih[k] +
-                        '</td><td>' + (breached ? 'lewat toleransi' : 'ok') + '</td></tr>';
-            }
-            bar.className = 'carbon-notification ' + notifClass(d.status) + ' carbon-mt-06';
-            bar.innerHTML =
-                '<div style="width:100%;">' +
-                '<div class="carbon-heading-02">Hasil: <span class="carbon-tag ' +
-                tagClass(d.status) + '">' + d.status_label + '</span></div>' +
-                '<table class="carbon-table carbon-mt-05"><thead><tr><th>Field</th>' +
-                '<th>Selisih</th><th>Keterangan</th></tr></thead><tbody>' + rows +
-                '</tbody></table></div>';
+            renderHasil(res.data);
         } catch (e) {
             bar.className = 'carbon-notification carbon-notification--error carbon-mt-06';
             bar.innerHTML = '<div><strong>Error:</strong> ' + e.message + '</div>';
         }
     }
+
+    const STATION_MODE_LABEL = {
+        mitra_measuring: 'Pengukuran Mitra',
+        mpc_measuring: 'Validasi MPC',
+        idle: 'Idle'
+    };
+
+    async function refreshStationStatus() {
+        const box = document.getElementById('stationStatus');
+        const btn = document.getElementById('btnUkur');
+        if (!box || !btn) return;
+        try {
+            const res = await fetch('/api/station/status');
+            const json = await res.json();
+            const data = (json && json.data) ? json.data : {};
+            if (data.tahap18_active) {
+                box.className = 'carbon-notification carbon-notification--warning carbon-mt-05';
+                box.innerHTML = '<div><strong>Alat sedang dipakai pengukuran fisik (PB ON).</strong> ' +
+                                'Tombol Ukur Paket nonaktif sampai operator tekan PB OFF.</div>';
+                btn.disabled = true;
+                btn.dataset.tahap18Blocked = '1';
+            } else if (data.busy && data.mode === 'mitra_measuring') {
+                box.className = 'carbon-notification carbon-notification--warning carbon-mt-05';
+                box.innerHTML = '<div>Mitra sedang mengukur (' +
+                                (data.owner || '-') + '). Tunggu sampai selesai.</div>';
+                btn.disabled = true;
+                btn.dataset.tahap18Blocked = '1';
+            } else {
+                box.className = 'carbon-notification carbon-notification--success carbon-mt-05';
+                box.innerHTML = '<div>Alat ukur siap digunakan untuk validasi MPC.</div>';
+                if (btn.dataset.tahap18Blocked === '1') {
+                    btn.disabled = false;
+                    btn.dataset.tahap18Blocked = '';
+                }
+            }
+        } catch (e) {
+            box.className = 'carbon-notification carbon-notification--error carbon-mt-05';
+            box.innerHTML = '<div>Gagal memeriksa status alat ukur.</div>';
+        }
+    }
+
+    setPreview(true);
+    refreshStationStatus();
+    setInterval(refreshStationStatus, 5000);
+    window.addEventListener('beforeunload', () => setPreview(false));
 </script>
 {% endblock %}
