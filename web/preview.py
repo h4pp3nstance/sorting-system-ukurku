@@ -13,7 +13,7 @@ import time
 
 from flask import Blueprint, Response, jsonify
 
-from web.auth import role_required, ROLE_MITRA
+from web.auth import role_required, ROLE_MITRA, ROLE_MPC, ROLE_ADMIN
 
 preview_bp = Blueprint('preview', __name__)
 
@@ -35,7 +35,7 @@ def _read_annotated_fresh():
 
 
 @preview_bp.route('/video_feed')
-@role_required(ROLE_MITRA)
+@role_required(ROLE_MITRA, ROLE_MPC, ROLE_ADMIN)
 def video_feed():
     from web.measurement_engine import get_camera_service
 

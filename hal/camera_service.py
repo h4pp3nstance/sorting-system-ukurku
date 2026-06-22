@@ -72,10 +72,22 @@ class CameraService:
     # Lifecycle
     # -----------------------------------------------------------------
     def start(self):
-        """Buka kamera + mulai grab thread. Idempotent."""
+        """Buka kamera + mulai grab thread. Idempotent.
+
+        Tolak start bila tahap18 (CLI legacy) sedang pegang kamera --
+        kebijakan tahap18 sebagai pemilik tunggal saat aktif.
+        """
         with self._lock:
             if self._running:
                 return
+            try:
+                from web.camera_lock import ensure_web_can_use_camera, CameraBusyError
+                ok, msg, pids = ensure_web_can_use_camera()
+                if not ok:
+                    raise CameraBusyError(msg, pids=pids)
+            except ImportError:
+                # camera_lock belum tersedia di lingkungan ini -- lanjut
+                pass
             cap, device, width, height = self._opener()
             if cap is None:
                 raise RuntimeError("Kamera gagal dibuka (CameraService).")
