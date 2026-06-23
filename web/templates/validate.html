@@ -182,12 +182,27 @@
 <script>
     const PACKAGE_ID = "{{ package.id }}";
 
+    // Preview lifecycle:
+    // - Default OFF saat page load (TIDAK auto-start lagi - dulu bikin
+    //   konflik kamera dengan tahap18 saat PB ON).
+    // - Auto-START hanya saat tahap18 detected jalan (PB ON di alat) supaya
+    //   operator MPC bisa lihat frame annotated dari /dev/shm.
+    // - Auto-STOP saat tahap18 berhenti (PB OFF) atau saat tombol
+    //   "Ukur Paket (Mode MPC)" ditekan (release viewer count sebelum
+    //   measure_real() pakai kamera).
+    // - User override (tombol manual) di-respect: kalau user toggle off,
+    //   tidak auto-start lagi sampai page reload.
     let previewOn = false;
-    function setPreview(on) {
+    let userPreviewOverride = false;
+    let previewAutoStarted = false;
+
+    function setPreview(on, opts) {
         const img = document.getElementById('cameraPreview');
         const ph = document.getElementById('previewPlaceholder');
         const btn = document.getElementById('previewBtn');
+        const fromAuto = !!(opts && opts.auto);
         previewOn = on;
+        previewAutoStarted = fromAuto && on;
         if (on) {
             img.onerror = () => {
                 setPreview(false);
@@ -196,18 +211,37 @@
             img.src = "{{ url_for('preview.video_feed') }}?t=" + Date.now();
             img.style.display = 'block';
             ph.style.display = 'none';
-            btn.textContent = 'Hentikan Preview';
+            if (btn) btn.textContent = 'Hentikan Preview';
         } else {
             img.onerror = null;
             img.src = "";
             img.style.display = 'none';
             ph.style.display = 'flex';
             if (ph.textContent.trim() === '') ph.textContent = 'Preview nonaktif';
-            btn.textContent = 'Mulai Preview';
+            if (btn) btn.textContent = 'Mulai Preview';
         }
     }
     function togglePreview() {
+        userPreviewOverride = true;
         setPreview(!previewOn);
+    }
+
+    // Edge-trigger sinkronisasi preview dengan status tahap18.
+    let lastTahap18Active = null;
+    function syncAutoPreview(tahap18Active) {
+        if (lastTahap18Active === tahap18Active) return;
+        const prev = lastTahap18Active;
+        lastTahap18Active = tahap18Active;
+        if (prev !== true && tahap18Active === true) {
+            // tahap18 baru start. Reset override, auto-start preview.
+            userPreviewOverride = false;
+            if (!previewOn) setPreview(true, {auto: true});
+        } else if (prev === true && tahap18Active !== true) {
+            // tahap18 berhenti. Auto-stop preview kalau di-start oleh auto.
+            if (previewOn && previewAutoStarted && !userPreviewOverride) {
+                setPreview(false);
+            }
+        }
     }
 
     function tagClass(status) {
@@ -285,6 +319,15 @@
         btn.textContent = 'Mengukur...';
         progress.style.display = 'flex';
 
+        // Release MJPEG viewer sebelum measure_real() pakai kamera, supaya
+        // tidak ada race dengan CameraService viewer count. Kalau preview
+        // sebelumnya di-start oleh auto, jangan dianggap user override.
+        if (previewOn) {
+            const wasAuto = previewAutoStarted;
+            setPreview(false);
+            previewAutoStarted = wasAuto;
+        }
+
         try {
             const res = await API.post('/mpc/measure', {
                 package_id: PACKAGE_ID,
@@ -345,6 +388,9 @@
             const res = await fetch('/api/station/status');
             const json = await res.json();
             const data = (json && json.data) ? json.data : {};
+            // Sinkron preview dengan status tahap18 (auto-start saat PB ON,
+            // auto-stop saat PB OFF) supaya release viewer count kamera.
+            syncAutoPreview(!!data.tahap18_active);
             if (data.tahap18_active) {
                 box.className = 'carbon-notification carbon-notification--warning carbon-mt-05';
                 box.innerHTML = '<div><strong>Alat sedang dipakai pengukuran fisik (PB ON).</strong> ' +
@@ -371,7 +417,10 @@
         }
     }
 
-    setPreview(true);
+    // Default OFF. Sebelumnya auto-start saat page load bikin Flask
+    // CameraService hold /dev/video0 terus-menerus -> konflik saat
+    // tahap18 standalone process butuh kamera (PB ON di alat).
+    setPreview(false);
     refreshStationStatus();
     setInterval(refreshStationStatus, 5000);
     window.addEventListener('beforeunload', () => setPreview(false));
