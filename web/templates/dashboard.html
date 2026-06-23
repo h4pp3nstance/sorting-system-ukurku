@@ -354,11 +354,20 @@
     let hwConnected = false;
 
     let previewOn = false;
-    function setPreview(on) {
+    // Auto-preview state mengikuti spec: preview kamera aktif otomatis saat
+    // tahap18 berjalan (PB Start ditekan), mati otomatis saat tahap18 berhenti.
+    // userPreviewOverride=true berarti user manual-toggle preview selama sesi
+    // tahap18 berjalan; auto-control tidak boleh override pilihan user sampai
+    // sesi tahap18 berikutnya (transisi off->on berikutnya).
+    let userPreviewOverride = false;
+    let previewAutoStarted = false; // true kalau preview ini di-start oleh auto-trigger
+    function setPreview(on, opts) {
         const img = document.getElementById('cameraPreview');
         const ph = document.getElementById('previewPlaceholder');
         const btn = document.getElementById('previewBtn');
+        const fromAuto = !!(opts && opts.auto);
         previewOn = on;
+        previewAutoStarted = fromAuto && on;
         if (on) {
             img.onerror = () => {
                 setPreview(false);
@@ -378,7 +387,30 @@
         }
     }
     function togglePreview() {
+        // User manual klik -> tandai override supaya auto-control respect.
+        userPreviewOverride = true;
         setPreview(!previewOn);
+    }
+    // Edge-trigger auto preview saat status tahap18 berubah.
+    let lastTahap18Running = null;
+    function syncAutoPreview(tahap18Running) {
+        if (lastTahap18Running === tahap18Running) return; // tidak ada edge
+        const prev = lastTahap18Running;
+        lastTahap18Running = tahap18Running;
+        // Edge OFF -> ON: tahap18 baru start (PB ditekan). Reset override,
+        // auto-start preview kalau belum on.
+        if (prev !== true && tahap18Running === true) {
+            userPreviewOverride = false;
+            if (!previewOn) setPreview(true, {auto: true});
+            return;
+        }
+        // Edge ON -> OFF: tahap18 berhenti. Auto-stop hanya kalau preview
+        // sebelumnya di-start oleh auto-trigger (bukan user manual).
+        if (prev === true && tahap18Running !== true) {
+            if (previewOn && previewAutoStarted && !userPreviewOverride) {
+                setPreview(false);
+            }
+        }
     }
 
     function renderHwStatus(connected) {
@@ -427,6 +459,8 @@
         } else {
             hint.textContent = d.tahap18_running ? 'Tahap 18 berjalan (sortir aktif)' : 'Box siap';
         }
+        // Auto-preview: nyala saat tahap18 mulai, mati saat tahap18 berhenti.
+        syncAutoPreview(!!d.tahap18_running);
     }
 
     async function refreshBoxStatus() {
