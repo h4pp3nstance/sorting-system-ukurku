@@ -619,7 +619,8 @@
                 <span class="carbon-header__nav-link" style="color: var(--carbon-gray-30); cursor: default;">
                     {{ user.name }} ({{ user.role|upper }})
                 </span>
-                <a id="logoutLink" href="{{ url_for('auth.logout') }}" class="carbon-header__nav-link">
+                <a id="logoutLink" href="{{ url_for('auth.logout') }}" class="carbon-header__nav-link"
+                   onclick="handleLogoutClick(event); return false;">
                     Logout
                 </a>
                 {% endif %}
@@ -842,6 +843,34 @@
         // Logout/switch account dikendalikan dari server-side route /logout.
         // Browser tidak lagi mengirim sendBeacon ke /api/system/standby agar tidak terjadi
         // request ganda yang berpotensi mengganggu web server.
+
+        // Pagar Tier 2/3: konfirmasi logout kalau tahap18 sedang jalan
+        // (operator tidak sengaja logout di tengah pengukuran).
+        // Endpoint /api/box/status sinkron dengan polling dashboard.
+        async function handleLogoutClick(ev) {
+            const link = document.getElementById('logoutLink');
+            const targetUrl = link ? link.href : '/logout';
+            let running = false;
+            try {
+                const r = await fetch('/api/box/status', { cache: 'no-store' });
+                if (r.ok) {
+                    const body = await r.json();
+                    running = !!(body && body.data && body.data.tahap18_running);
+                }
+            } catch (e) { /* network fail, jangan blokir */ }
+
+            if (running) {
+                const ok = window.confirm(
+                    'Mesin ukur sedang JALAN.\n\n' +
+                    'Kalau logout sekarang, paket terakhir mungkin masuk tanpa data ' +
+                    'pengirim/penerima (karena sesi form draft kamu akan hilang).\n\n' +
+                    'Klik OK kalau memang mau logout.\n' +
+                    'Klik Cancel untuk tunggu paket selesai dulu.'
+                );
+                if (!ok) return;
+            }
+            window.location.href = targetUrl;
+        }
     </script>
     
     {% block extra_js %}{% endblock %}

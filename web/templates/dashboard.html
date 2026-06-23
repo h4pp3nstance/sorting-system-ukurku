@@ -248,12 +248,20 @@
         <a href="/receipt/{{ status.last_package.id }}"
            target="_blank"
            class="carbon-btn carbon-btn--secondary carbon-mt-05"
-           style="width: 100%;">
+           style="width: 100%;"
+           data-package-id="{{ status.last_package.id }}"
+           data-has-sender="{% if status.last_package.sender and status.last_package.sender.nama %}1{% else %}0{% endif %}"
+           data-has-recipient="{% if status.last_package.recipient and status.last_package.recipient.nama %}1{% else %}0{% endif %}"
+           onclick="return confirmReceiptPrint(this);">
             Cetak Resi
         </a>
         <a href="/receipt/{{ status.last_package.id }}.pdf"
            class="carbon-btn carbon-btn--tertiary carbon-mt-05"
-           style="width: 100%;">
+           style="width: 100%;"
+           data-package-id="{{ status.last_package.id }}"
+           data-has-sender="{% if status.last_package.sender and status.last_package.sender.nama %}1{% else %}0{% endif %}"
+           data-has-recipient="{% if status.last_package.recipient and status.last_package.recipient.nama %}1{% else %}0{% endif %}"
+           onclick="return confirmReceiptPrint(this);">
             Download Resi PDF
         </a>
         {% if status.last_package.detection_image %}
@@ -780,7 +788,9 @@
             'EXPRESS': 'carbon-tag--purple',
             'KARGO': 'carbon-tag--teal'
         }[pkg.service_type];
-        
+        const hasSender = (pkg.sender && pkg.sender.nama) ? '1' : '0';
+        const hasRecipient = (pkg.recipient && pkg.recipient.nama) ? '1' : '0';
+
         card.innerHTML = `
             <div class="package-card__header">
                 <div>
@@ -813,6 +823,20 @@
                     ${formatCurrency(pkg.price)}
                 </span>
             </div>
+            <a href="/receipt/${pkg.id}" target="_blank"
+               class="carbon-btn carbon-btn--secondary carbon-mt-05"
+               style="width: 100%;"
+               data-package-id="${pkg.id}"
+               data-has-sender="${hasSender}"
+               data-has-recipient="${hasRecipient}"
+               onclick="return confirmReceiptPrint(this);">Cetak Resi</a>
+            <a href="/receipt/${pkg.id}.pdf"
+               class="carbon-btn carbon-btn--tertiary carbon-mt-05"
+               style="width: 100%;"
+               data-package-id="${pkg.id}"
+               data-has-sender="${hasSender}"
+               data-has-recipient="${hasRecipient}"
+               onclick="return confirmReceiptPrint(this);">Download Resi PDF</a>
         `;
     }
     
@@ -912,6 +936,12 @@
                 }
                 // Visual notification
                 showNotification('Paket baru terukur: ' + data.data.package.service_type);
+                // Pagar Tier 2: auto-popup Lengkapi Data kalau paket masuk
+                // tanpa sender/recipient (operator lupa isi form sebelum PB).
+                maybeAutoOpenCompletePartiesModal(data.data.package);
+                // Reset draft state — paket sukses masuk, draft sudah ter-consume.
+                draftSavedOnServer = false;
+                updateReadyChecklist();
                 break;
                 
             case 'stats_updated':
@@ -1158,6 +1188,52 @@
 
     function closeCompletePartiesModal() {
         document.getElementById('completePartiesModal').style.display = 'none';
+    }
+
+    // Pagar Tier 2: auto-popup Lengkapi Data kalau paket masuk tanpa
+    // sender/recipient (operator lupa isi form sebelum tekan PB Start).
+    function maybeAutoOpenCompletePartiesModal(pkg) {
+        if (!pkg || !pkg.id) return;
+        const senderOk = !!(pkg.sender && pkg.sender.nama);
+        const recipientOk = !!(pkg.recipient && pkg.recipient.nama);
+        if (senderOk && recipientOk) return; // paket lengkap, no popup
+        // Delay sedikit supaya last package card sempat ke-update dulu.
+        setTimeout(() => {
+            openCompletePartiesModal(pkg.id);
+            const err = document.getElementById('cpError');
+            if (err) {
+                err.style.display = 'block';
+                err.className = 'carbon-helper-text';
+                err.style.color = '#da1e28';
+                err.style.fontWeight = '600';
+                err.textContent = 'Paket #' + pkg.id +
+                    ' masuk tanpa data pengirim/penerima. Isi sekarang sebelum cetak resi.';
+            }
+        }, 350);
+    }
+
+    // Pagar Tier 2: konfirmasi cetak resi kalau data pengirim/penerima
+    // belum lengkap. Tawarkan buka modal Lengkapi Data dulu, atau
+    // lanjut cetak resi cacat (operator harus eksplisit konfirmasi).
+    function confirmReceiptPrint(anchorEl) {
+        if (!anchorEl) return true;
+        const hasSender = anchorEl.dataset.hasSender === '1';
+        const hasRecipient = anchorEl.dataset.hasRecipient === '1';
+        if (hasSender && hasRecipient) return true; // data lengkap, lanjut
+        const packageId = anchorEl.dataset.packageId;
+        const missing = [];
+        if (!hasSender) missing.push('pengirim');
+        if (!hasRecipient) missing.push('penerima');
+        const msg = 'Resi paket #' + packageId + ' akan dicetak TANPA data ' +
+            missing.join(' dan ') + '.\n\n' +
+            'Klik OK untuk isi data dulu (disarankan).\n' +
+            'Klik Cancel kalau memang mau cetak resi cacat.';
+        const isiDulu = window.confirm(msg);
+        if (isiDulu) {
+            openCompletePartiesModal(packageId);
+            return false; // batalkan cetak resi
+        }
+        return true; // lanjutkan cetak resi cacat (operator eksplisit pilih)
     }
 
     async function submitCompleteParties() {
