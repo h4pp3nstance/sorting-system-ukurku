@@ -844,22 +844,39 @@
         // Browser tidak lagi mengirim sendBeacon ke /api/system/standby agar tidak terjadi
         // request ganda yang berpotensi mengganggu web server.
 
-        // Pagar Tier 2/3: konfirmasi logout kalau tahap18 sedang jalan
-        // (operator tidak sengaja logout di tengah pengukuran).
-        // Endpoint /api/box/status sinkron dengan polling dashboard.
+        // Pagar Tier 2/3: konfirmasi logout kalau ada operasi sedang jalan
+        // (tahap18 measure atau MPC ARM aktif). Operator tidak sengaja
+        // logout di tengah pengukuran = paket masuk tanpa data.
         async function handleLogoutClick(ev) {
             const link = document.getElementById('logoutLink');
             const targetUrl = link ? link.href : '/logout';
-            let running = false;
+
+            // Tier 3: cek MPC ARM aktif (banner visible di halaman MPC).
+            const armedBanner = document.getElementById('armedBanner');
+            const mpcArmed = !!(armedBanner && armedBanner.style.display !== 'none' &&
+                armedBanner.offsetParent !== null);
+
+            // Tier 2: cek tahap18 jalan via /api/box/status.
+            let tahap18Running = false;
             try {
                 const r = await fetch('/api/box/status', { cache: 'no-store' });
                 if (r.ok) {
                     const body = await r.json();
-                    running = !!(body && body.data && body.data.tahap18_running);
+                    tahap18Running = !!(body && body.data && body.data.tahap18_running);
                 }
             } catch (e) { /* network fail, jangan blokir */ }
 
-            if (running) {
+            if (mpcArmed) {
+                const ok = window.confirm(
+                    'MPC sedang ARM (menunggu paket fisik).\n\n' +
+                    'Kalau logout sekarang, sesi ARM batal dan validasi yang ' +
+                    'sudah disiapkan akan hilang. Paket yang masuk akan tercatat ' +
+                    'tanpa data pengukuran manual.\n\n' +
+                    'Klik OK kalau memang mau logout.\n' +
+                    'Klik Cancel untuk tunggu paket selesai diukur dulu.'
+                );
+                if (!ok) return;
+            } else if (tahap18Running) {
                 const ok = window.confirm(
                     'Mesin ukur sedang JALAN.\n\n' +
                     'Kalau logout sekarang, paket terakhir mungkin masuk tanpa data ' +
