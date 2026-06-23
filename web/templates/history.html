@@ -22,10 +22,10 @@
             <option value="">Urutkan...</option>
             <option value="1:desc">Waktu terbaru</option>
             <option value="1:asc">Waktu terlama</option>
-            <option value="7:desc">Biaya tertinggi</option>
-            <option value="7:asc">Biaya terendah</option>
-            <option value="5:desc">Chargeable terberat</option>
-            <option value="5:asc">Chargeable teringan</option>
+            <option value="8:desc">Biaya tertinggi</option>
+            <option value="8:asc">Biaya terendah</option>
+            <option value="6:desc">Chargeable terberat</option>
+            <option value="6:asc">Chargeable teringan</option>
         </select>
         <a id="exportCsvBtn" href="/history/export.csv"
            class="carbon-btn carbon-btn--tertiary carbon-btn--sm">
@@ -70,6 +70,7 @@
             <tr>
                 <th data-sort-key="id">ID</th>
                 <th data-sort-key="time">Waktu</th>
+                <th>Pengirim / Penerima</th>
                 <th>Dimensi (P×L×T)</th>
                 <th data-sort-key="actual">Berat Aktual</th>
                 <th data-sort-key="volume">Berat Volumetrik</th>
@@ -84,6 +85,17 @@
             <tr data-type="{{ pkg.service_type }}">
                 <td data-sort="{{ pkg.id }}"><code>#{{ pkg.id }}</code></td>
                 <td>{{ pkg.timestamp[:19] }}</td>
+                <td style="font-size:0.8rem;line-height:1.5;">
+                    {% if pkg.sender and pkg.sender.nama %}
+                    <span style="color:var(--carbon-text-secondary);">&#8593;</span> {{ pkg.sender.nama }}{% if pkg.sender.telepon %}<br><span style="color:var(--carbon-text-secondary);padding-left:1em;">{{ pkg.sender.telepon }}</span>{% endif %}<br>
+                    {% endif %}
+                    {% if pkg.recipient and pkg.recipient.nama %}
+                    <span style="color:var(--carbon-text-secondary);">&#8595;</span> {{ pkg.recipient.nama }}{% if pkg.recipient.telepon %}<br><span style="color:var(--carbon-text-secondary);padding-left:1em;">{{ pkg.recipient.telepon }}</span>{% endif %}
+                    {% endif %}
+                    {% if not (pkg.sender and pkg.sender.nama) and not (pkg.recipient and pkg.recipient.nama) %}
+                    <span style="color:var(--carbon-text-secondary);">—</span>
+                    {% endif %}
+                </td>
                 <td>{{ pkg.dimensions.panjang }} × {{ pkg.dimensions.lebar }} × {{ pkg.dimensions.tinggi }} cm</td>
                 <td data-sort="{{ pkg.weight.aktual }}">{{ pkg.weight.aktual }} g</td>
                 <td data-sort="{{ pkg.weight.volumetrik }}">{{ pkg.weight.volumetrik }} g</td>
@@ -103,7 +115,7 @@
             </tr>
             {% else %}
             <tr id="noDataRow">
-                <td colspan="9" class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
+                <td colspan="10" class="carbon-text-center carbon-text-secondary" style="padding: var(--space-07);">
                     <svg width="48" height="48" viewBox="0 0 32 32" fill="currentColor" style="opacity: 0.5;">
                         <path d="M26 30H6a2 2 0 01-2-2V4a2 2 0 012-2h14l8 8v18a2 2 0 01-2 2zM6 4v24h20V12h-6V4zm14 4l4 4h-4z"/>
                     </svg>
