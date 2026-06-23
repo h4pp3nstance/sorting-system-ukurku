@@ -118,8 +118,9 @@
 <div class="carbon-tile carbon-mb-06">
     <div class="carbon-flex carbon-flex--between carbon-mb-05">
         <h2 class="carbon-heading-03">Preview Kamera</h2>
-        <button id="previewBtn" class="carbon-btn carbon-btn--tertiary"
-                onclick="togglePreview()">Mulai Preview</button>
+        <span class="carbon-helper-text carbon-text-secondary">
+            Aktif otomatis saat PB On ditekan
+        </span>
     </div>
     <div style="background:#161616;border-radius:4px;overflow:hidden;
                 display:flex;align-items:center;justify-content:center;
@@ -414,17 +415,13 @@
     let hwConnected = false;
 
     let previewOn = false;
-    // Auto-preview state mengikuti spec: preview kamera aktif otomatis saat
-    // tahap18 berjalan (PB Start ditekan), mati otomatis saat tahap18 berhenti.
-    // userPreviewOverride=true berarti user manual-toggle preview selama sesi
-    // tahap18 berjalan; auto-control tidak boleh override pilihan user sampai
-    // sesi tahap18 berikutnya (transisi off->on berikutnya).
-    let userPreviewOverride = false;
-    let previewAutoStarted = false; // true kalau preview ini di-start oleh auto-trigger
+    // Auto-preview only: preview kamera aktif otomatis saat tahap18 jalan
+    // (PB On ditekan), mati saat tahap18 berhenti. Tidak ada tombol manual
+    // lagi (Dani: redundant, PB On sudah auto-start).
+    let previewAutoStarted = false;
     function setPreview(on, opts) {
         const img = document.getElementById('cameraPreview');
         const ph = document.getElementById('previewPlaceholder');
-        const btn = document.getElementById('previewBtn');
         const fromAuto = !!(opts && opts.auto);
         previewOn = on;
         previewAutoStarted = fromAuto && on;
@@ -436,41 +433,27 @@
             img.src = "{{ url_for('preview.video_feed') }}?t=" + Date.now();
             img.style.display = 'block';
             ph.style.display = 'none';
-            btn.textContent = 'Hentikan Preview';
         } else {
             img.onerror = null;
             img.src = "";
             img.style.display = 'none';
             ph.style.display = 'flex';
             if (ph.textContent.trim() === '') ph.textContent = 'Preview nonaktif';
-            btn.textContent = 'Mulai Preview';
         }
-    }
-    function togglePreview() {
-        // User manual klik -> tandai override supaya auto-control respect.
-        userPreviewOverride = true;
-        setPreview(!previewOn);
     }
     // Edge-trigger auto preview saat status tahap18 berubah.
     let lastTahap18Running = null;
     function syncAutoPreview(tahap18Running) {
-        if (lastTahap18Running === tahap18Running) return; // tidak ada edge
+        if (lastTahap18Running === tahap18Running) return;
         const prev = lastTahap18Running;
         lastTahap18Running = tahap18Running;
-        // Edge OFF -> ON: tahap18 baru start (PB ditekan). Reset override,
-        // auto-start preview kalau belum on.
         if (prev !== true && tahap18Running === true) {
-            userPreviewOverride = false;
             if (!previewOn) setPreview(true, {auto: true});
-            // Pagar: kalau operator tekan PB tapi form belum siap, alert keras
-            // supaya tidak lanjut tanpa data pengirim/penerima.
             warnIfPBPressedWithoutForm();
             return;
         }
-        // Edge ON -> OFF: tahap18 berhenti. Auto-stop hanya kalau preview
-        // sebelumnya di-start oleh auto-trigger (bukan user manual).
         if (prev === true && tahap18Running !== true) {
-            if (previewOn && previewAutoStarted && !userPreviewOverride) {
+            if (previewOn && previewAutoStarted) {
                 setPreview(false);
             }
         }
