@@ -3,6 +3,13 @@
 {% block title %}Pengukuran Paket - UkurKu{% endblock %}
 
 {% block content %}
+<style>
+    @keyframes guardPulse {
+        0%, 100% { transform: scale(1); box-shadow: 0 2px 6px rgba(218,30,40,0.35); }
+        50% { transform: scale(1.02); box-shadow: 0 6px 18px rgba(218,30,40,0.65); }
+    }
+    .ready-check-item { transition: color 0.2s ease; }
+</style>
 {% if error %}
 <div class="carbon-notification carbon-notification--error carbon-mb-06">
     <div>
@@ -44,6 +51,51 @@
         <strong>Sistem Siap</strong>
         <span class="carbon-text-secondary"> — {{ status.mode_info.description }}</span>
     </div>
+</div>
+
+<!-- Banner WARNING: JANGAN tekan PB Start kalau form belum diisi. Visible saat
+     sender_nama atau recipient_nama kosong. Hilang otomatis saat keduanya terisi. -->
+<div id="formGuardBanner" class="carbon-mb-06" style="display:none;
+        background:#da1e28; color:#fff; padding:var(--space-06);
+        border-radius:4px; border-left:6px solid #750e13;
+        box-shadow:0 2px 6px rgba(218,30,40,0.35);">
+    <div style="display:flex; align-items:center; gap:var(--space-05);">
+        <span style="font-size:1.8rem; line-height:1;">⚠️</span>
+        <div style="flex:1;">
+            <div style="font-weight:700; font-size:1.05rem; margin-bottom:4px;">
+                JANGAN TEKAN PB START
+            </div>
+            <div id="formGuardBannerText" style="font-size:0.95rem; opacity:0.95;">
+                Isi nama Pengirim & Penerima dulu di form di bawah, lalu tekan tombol hijau di alat.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Checklist "Siap mengukur?" — operator gaptek bisa lihat status persiapan -->
+<div id="readyChecklist" class="carbon-tile carbon-mb-06" style="border-left:4px solid #f1c21b;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-04); margin-bottom:var(--space-04);">
+        <h3 class="carbon-heading-02" style="margin:0;">Siap mengukur?</h3>
+        <span id="readyChecklistStatus" class="carbon-tag carbon-tag--gray">Belum siap</span>
+    </div>
+    <ul style="list-style:none; padding:0; margin:0;">
+        <li id="checkSender" class="ready-check-item" style="display:flex; align-items:center; gap:var(--space-04); padding:6px 0;">
+            <span class="ready-check-icon" style="font-size:1.2rem;">⬜</span>
+            <span>Nama <strong>Pengirim</strong> sudah diisi</span>
+        </li>
+        <li id="checkRecipient" class="ready-check-item" style="display:flex; align-items:center; gap:var(--space-04); padding:6px 0;">
+            <span class="ready-check-icon" style="font-size:1.2rem;">⬜</span>
+            <span>Nama <strong>Penerima</strong> sudah diisi</span>
+        </li>
+        <li id="checkDraft" class="ready-check-item" style="display:flex; align-items:center; gap:var(--space-04); padding:6px 0;">
+            <span class="ready-check-icon" style="font-size:1.2rem;">⬜</span>
+            <span>Data <strong>tersimpan</strong> di sistem</span>
+        </li>
+        <li id="checkReady" class="ready-check-item" style="display:flex; align-items:center; gap:var(--space-04); padding:6px 0; font-weight:600;">
+            <span class="ready-check-icon" style="font-size:1.2rem;">⬜</span>
+            <span>Boleh tekan <strong>PB Start (tombol hijau)</strong> di alat</span>
+        </li>
+    </ul>
 </div>
 
 <!-- Status Box Fisik (tombol + lampu dari tahap17) -->
@@ -402,6 +454,9 @@
         if (prev !== true && tahap18Running === true) {
             userPreviewOverride = false;
             if (!previewOn) setPreview(true, {auto: true});
+            // Pagar: kalau operator tekan PB tapi form belum siap, alert keras
+            // supaya tidak lanjut tanpa data pengirim/penerima.
+            warnIfPBPressedWithoutForm();
             return;
         }
         // Edge ON -> OFF: tahap18 berhenti. Auto-stop hanya kalau preview
@@ -411,6 +466,35 @@
                 setPreview(false);
             }
         }
+    }
+
+    function warnIfPBPressedWithoutForm() {
+        const senderName = (document.getElementById('sender_nama')?.value || '').trim();
+        const recipientName = (document.getElementById('recipient_nama')?.value || '').trim();
+        if (senderName && recipientName) return; // form OK, no warning
+        const banner = document.getElementById('formGuardBanner');
+        if (!banner) return;
+        const textEl = document.getElementById('formGuardBannerText');
+        if (textEl) {
+            textEl.textContent = 'Tahap 18 sudah jalan tapi form belum diisi. ' +
+                'Paket ini akan masuk TANPA data pengirim/penerima. ' +
+                'Setelah paket muncul, klik "Lengkapi Data" di kartu paket untuk isi sender/recipient.';
+        }
+        banner.style.animation = 'guardPulse 0.8s ease-in-out 4';
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.2);
+            setTimeout(() => {
+                const o2 = ctx.createOscillator(); o2.connect(gain);
+                o2.frequency.value = 660; o2.start(); o2.stop(ctx.currentTime + 0.5);
+            }, 250);
+        } catch (e) { /* audio diabaikan kalau gagal */ }
     }
 
     function renderHwStatus(connected) {
@@ -924,13 +1008,19 @@
             if (!r.ok) throw new Error('http ' + r.status);
             const body = await r.json();
             if (body.success) {
+                draftSavedOnServer = !!body.data.draft;
                 setDraftStatus(body.data.draft ? 'Tersimpan' : 'Form kosong', 'ok');
             } else {
+                draftSavedOnServer = false;
                 setDraftStatus('Gagal simpan: ' + (body.error || ''), 'error');
             }
         } catch (e) {
-            if (e.name !== 'AbortError') setDraftStatus('Gagal simpan draft', 'error');
+            if (e.name !== 'AbortError') {
+                draftSavedOnServer = false;
+                setDraftStatus('Gagal simpan draft', 'error');
+            }
         }
+        updateReadyChecklist();
     }
 
     function scheduleFormDraftSave() {
@@ -942,10 +1032,10 @@
     async function restoreFormDraft() {
         try {
             const r = await fetch('/api/form/draft');
-            if (!r.ok) return;
+            if (!r.ok) { updateReadyChecklist(); return; }
             const body = await r.json();
             const draft = body?.data?.draft;
-            if (!draft) return;
+            if (!draft) { updateReadyChecklist(); return; }
             const set = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v || ''; };
             if (draft.sender) {
                 set('sender_nama', draft.sender.nama);
@@ -957,15 +1047,68 @@
                 set('recipient_telepon', draft.recipient.telepon);
                 set('recipient_alamat', draft.recipient.alamat);
             }
+            draftSavedOnServer = true;
             setDraftStatus('Draft dipulihkan', 'ok');
         } catch (e) { /* silent */ }
+        updateReadyChecklist();
     }
 
     function attachFormDraftListeners() {
         FORM_FIELDS.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.addEventListener('input', scheduleFormDraftSave);
+            if (el) {
+                el.addEventListener('input', scheduleFormDraftSave);
+                el.addEventListener('input', updateReadyChecklist);
+            }
         });
+    }
+
+    let draftSavedOnServer = false;
+    let readyChecklistInitialized = false;
+
+    function updateReadyChecklist() {
+        const senderName = (document.getElementById('sender_nama')?.value || '').trim();
+        const recipientName = (document.getElementById('recipient_nama')?.value || '').trim();
+        const senderOk = senderName.length > 0;
+        const recipientOk = recipientName.length > 0;
+        const draftOk = senderOk && recipientOk && draftSavedOnServer;
+        const allReady = senderOk && recipientOk && draftOk;
+
+        setCheckItem('checkSender', senderOk);
+        setCheckItem('checkRecipient', recipientOk);
+        setCheckItem('checkDraft', draftOk);
+        setCheckItem('checkReady', allReady);
+
+        const status = document.getElementById('readyChecklistStatus');
+        if (status) {
+            if (allReady) {
+                status.className = 'carbon-tag carbon-tag--green';
+                status.textContent = 'Siap';
+            } else {
+                status.className = 'carbon-tag carbon-tag--gray';
+                status.textContent = 'Belum siap';
+            }
+        }
+
+        const banner = document.getElementById('formGuardBanner');
+        if (banner) {
+            banner.style.display = (senderOk && recipientOk) ? 'none' : 'block';
+        }
+
+        readyChecklistInitialized = true;
+    }
+
+    function setCheckItem(id, ok) {
+        const li = document.getElementById(id);
+        if (!li) return;
+        const icon = li.querySelector('.ready-check-icon');
+        if (ok) {
+            if (icon) { icon.textContent = '✅'; }
+            li.style.color = 'var(--carbon-support-success, #198038)';
+        } else {
+            if (icon) { icon.textContent = '⬜'; }
+            li.style.color = '';
+        }
     }
 
     // Initialize real-time updates on page load
@@ -977,6 +1120,7 @@
         setInterval(refreshBoxStatus, 3000);
         attachFormDraftListeners();
         restoreFormDraft();
+        updateReadyChecklist();
     });
     
     // Modal Lengkapi Data Pengirim/Penerima untuk paket existing (mis. #512
