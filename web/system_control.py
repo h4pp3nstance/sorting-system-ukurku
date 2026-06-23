@@ -210,4 +210,69 @@ def request_standby(reason="web_request", wait_seconds=4.0, allow_sigterm=True):
                     result["ok"] = False
 
         result["message"] = "Perintah standby dikirim hanya ke PID Tahap 18. Tahap 17 akan mematikan motor saat Tahap 18 berhenti."
+
+        # Force-release Flask CameraService supaya /dev/video0 ter-lepas.
+        # Tanpa ini, viewer ref-count bisa stuck > 0 kalau MJPEG stream
+        # client disconnect ungracefully (browser navigate away tanpa
+        # finally clause sempat jalan) -> kamera tidak pernah dilepas ->
+        # tahap17 melihat alat masih sibuk -> lampu kuning standby tidak
+        # nyala. Setelah logout, asumsi: tidak ada user yang butuh
+        # preview. Aman force stop.
+        try:
+            cam_action = _force_release_camera_service()
+            result["actions"].append(cam_action)
+        except Exception as exc:  # noqa: BLE001
+            result["actions"].append({
+                "component": "camera_service",
+                "ok": False,
+                "message": f"gagal release: {exc}",
+            })
+
         return result
+
+
+def _force_release_camera_service():
+    """Lepas Flask CameraService viewer + stop kamera kalau idle.
+
+    Dipanggil saat logout/switch account. Tahap18 sudah di-SIGINT
+    sebelumnya; kalau measurement session aktif, jangan dipaksa stop
+    (biar engine selesai). Tapi reset viewer count ke 0 supaya
+    release_if_idle() bisa jalan setelah session selesai.
+    """
+    action = {"component": "camera_service", "ok": True}
+    try:
+        from hal.camera_service import get_camera_service
+    except Exception as exc:  # noqa: BLE001
+        action["ok"] = False
+        action["message"] = f"camera_service import gagal: {exc}"
+        return action
+
+    try:
+        cam = get_camera_service()
+    except Exception as exc:  # noqa: BLE001
+        action["ok"] = False
+        action["message"] = f"get_camera_service gagal: {exc}"
+        return action
+
+    viewers_before = None
+    try:
+        viewers_before = cam.viewer_count()
+        while cam.viewer_count() > 0:
+            cam.remove_viewer()
+    except Exception as exc:  # noqa: BLE001
+        action["message"] = f"reset viewer gagal: {exc}"
+
+    released = False
+    try:
+        released = bool(cam.release_if_idle())
+    except Exception as exc:  # noqa: BLE001
+        action["ok"] = False
+        action["message"] = f"release_if_idle gagal: {exc}"
+
+    action["viewers_before"] = viewers_before
+    action["released"] = released
+    if "message" not in action:
+        action["message"] = (
+            "kamera dilepas" if released else "viewer di-reset (session aktif)"
+        )
+    return action
