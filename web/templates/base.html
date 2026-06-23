@@ -619,7 +619,7 @@
                 <span class="carbon-header__nav-link" style="color: var(--carbon-gray-30); cursor: default;">
                     {{ user.name }} ({{ user.role|upper }})
                 </span>
-                <a href="{{ url_for('auth.logout') }}" class="carbon-header__nav-link">
+                <a id="logoutLink" href="{{ url_for('auth.logout') }}" class="carbon-header__nav-link">
                     Logout
                 </a>
                 {% endif %}
@@ -836,6 +836,12 @@
                     table.dataset.sortDir || 'asc');
             }
         };
+
+
+        // Catatan revisi aman:
+        // Logout/switch account dikendalikan dari server-side route /logout.
+        // Browser tidak lagi mengirim sendBeacon ke /api/system/standby agar tidak terjadi
+        // request ganda yang berpotensi mengganggu web server.
     </script>
     
     {% block extra_js %}{% endblock %}

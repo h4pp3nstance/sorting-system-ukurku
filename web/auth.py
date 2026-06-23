@@ -423,7 +423,22 @@ def login():
 
 @auth_bp.route("/logout", methods=["GET", "POST"])
 def logout():
-    """Log out and return to the landing page."""
+    """Log out and return to the landing page.
+
+    Safety rule:
+    Jika user logout/switch account saat proses RUN, hentikan Tahap 18 lebih dulu.
+    Revisi aman:
+    - request standby hanya dilakukan dari server-side logout ini.
+    - system_control.py hanya menghentikan PID Tahap 18, bukan process group Python.
+    - run_web.py tidak ikut dimatikan.
+    """
+    try:
+        from web.system_control import request_standby
+        request_standby(reason="logout_or_switch_account", wait_seconds=2.0)
+    except Exception as exc:
+        # Logout tetap berjalan walaupun perintah standby gagal.
+        print(f"WARNING: request standby saat logout gagal: {exc}", flush=True)
+
     logout_user()
-    flash("Anda telah keluar.", "info")
+    flash("Anda telah keluar. Jika alat sedang RUN, sistem diminta kembali ke STANDBY.", "info")
     return redirect(url_for("main.landing"))
