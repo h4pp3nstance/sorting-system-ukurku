@@ -183,7 +183,7 @@
     <h2 class="carbon-heading-03 carbon-mb-05">Pengaturan Sistem</h2>
     <div class="carbon-grid carbon-grid--cols-2">
         <div class="carbon-tile">
-            <h3 class="carbon-heading-02 carbon-mb-05">Toleransi Validasi</h3>
+            <h3 class="carbon-heading-02 carbon-mb-05">Parameter Toleransi Validasi MPC</h3>
             <p class="carbon-helper-text carbon-mb-05">Batas selisih Mitra vs MPC yang masih dianggap sesuai.</p>
             <form method="POST" action="{{ url_for('main.admin_settings_update') }}">
                 <input type="hidden" name="section" value="toleransi">
@@ -235,8 +235,8 @@
         </div>
 
         <div class="carbon-tile">
-            <h3 class="carbon-heading-02 carbon-mb-05">Ambang Klasifikasi Berat</h3>
-            <p class="carbon-helper-text carbon-mb-05">Batas berat tagihan (gram) per layanan. REGULER &le; batas1, EXPRESS &le; batas2, sisanya KARGO.</p>
+            <h3 class="carbon-heading-02 carbon-mb-05">Ambang Klasifikasi Chargeable Weight</h3>
+            <p class="carbon-helper-text carbon-mb-05">Batas chargeable weight (gram) yang dipakai untuk klasifikasi layanan. Rekomendasi penelitian: REGULER 50–300 g, EXPRESS 301–550 g, KARGO 551–800 g.</p>
             <form method="POST" action="{{ url_for('main.admin_settings_update') }}">
                 <input type="hidden" name="section" value="klasifikasi">
                 <div class="form-group">
